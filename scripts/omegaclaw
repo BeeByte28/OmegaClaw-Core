@@ -232,7 +232,7 @@ def _choose_provider():
         elif c in ["1", "2", "3", "4", "5", "6"]:
             provider_id = int(c) - 1
         else:
-            print("Please enter 1-4 or 'q'", file=sys.stderr)
+            print("Please enter 1-6 or 'q'", file=sys.stderr)
             continue
 
         providers = [
@@ -449,7 +449,7 @@ help() {
     echo -e "\t              Pass API token via environment variable."
     echo -e "\t-u <LLM API url> set LLM API URL for the local models (Ollama-local)"
     echo -e "\t-c <IRC channel> set IRC channel"
-    echo -e "\t-t <channel type> set communication channel type: irc|telegram|slack|websocket"
+    echo -e "\t-t <channel type> set communication channel type: irc|telegram|slack|websocket|mattermost|test"
     echo -e "\t-d <Docker image> set Docker image name (default omegaclaw:latest)"
 }
 
@@ -512,13 +512,13 @@ options() {
             ;;
         Test)
             embeddingprovider="Local"
-            api_token_var="TEST_API_KEY"
+            api_token_var="TEST_SERVER_IP"
             ;;
         *) help
            return 1
            ;;
     esac
-    if [ "${!api_token_var+x}" = "x" ]; then
+    if [[ -n "${!api_token_var:-}" ]]; then
         api_token="${!api_token_var}"
     fi
 }
@@ -557,6 +557,8 @@ start() {
     elif [ "${commchannel}" = "websocket" ]; then
       docker_cmd+=("WS_URL=${WS_URL}")
       docker_cmd+=("WS_TOKEN=${WS_TOKEN}")
+    elif [ "${commchannel}" = "test" ]; then
+      docker_cmd+=("TEST_SERVER_IP=${TEST_SERVER_IP}")
     else
       echo "Unsupported commchannel: ${commchannel}" >&2
       return 1
