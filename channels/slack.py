@@ -104,7 +104,14 @@ def _is_allowed_message(channel_id, user_id, msg):
         if auth.verify_token(candidate):
             _authenticated_user_id = user_id
             _channel_id = channel_id
+            if not auth.store_authenticated_user_id(user_id):
+                print(f"[SLACK] Could not store authenticated user ID {user_id!r} in nginx")
             return "auth_bound"
+        else:
+            if auth.get_saved_user_id() == user_id:
+                _authenticated_user_id = user_id
+                _channel_id = channel_id
+                return "allow"
         return "ignore"
 
 

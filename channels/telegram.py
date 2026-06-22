@@ -128,13 +128,18 @@ def _is_allowed_message(chat_id, user_id, msg):
             if chat_id != _chat_id:
                 return "ignore"
             return "allow" if user_id == _authenticated_user_id else "ignore"
-        if not _is_auth_command(msg):
-            return "ignore"
         candidate = _parse_auth_candidate(msg)
         if auth.verify_token(candidate):
             _authenticated_user_id = user_id
             _chat_id = chat_id
+            if not auth.store_authenticated_user_id(user_id):
+                print(f"[TELEGRAM] Could not store authenticated user ID {user_id!r} in nginx")
             return "auth_bound"
+        else:
+            if auth.get_saved_user_id() == user_id:
+                _authenticated_user_id = user_id
+                _chat_id = chat_id
+                return "allow"
         return "ignore"
 
 

@@ -7,6 +7,9 @@ events {
 }
 
 http {
+    log_format authenticated_user escape=json
+        '{"time":"$time_iso8601","user_id":"$http_x_authenticated_user_id"}';
+
     client_body_temp_path /tmp/client_body;
     proxy_temp_path       /tmp/proxy;
     fastcgi_temp_path     /tmp/fastcgi;
@@ -147,10 +150,31 @@ http {
             return 200 '{"match":false}';
         }
 
+        # Local adapters record the identity bound by a successful auth.
+        # The resulting JSON-lines file is owned by nginx at
+        # /opt/nginx/authenticated-users.log.
+        location = /auth/user {
+            allow 127.0.0.1;
+            allow ::1;
+            deny all;
+            limit_except POST {
+                deny all;
+            }
+            access_log /opt/nginx/authenticated-users.log authenticated_user;
+            return 204;
+        }
+
+        location = /auth/users {
+            allow 127.0.0.1;
+            allow ::1;
+            deny all;
+            default_type application/x-ndjson;
+            alias /opt/nginx/authenticated-users.log;
+        }
+
         location /health {
             return 200 "ok\n";
             add_header Content-Type text/plain;
         }
     }
 }
-
