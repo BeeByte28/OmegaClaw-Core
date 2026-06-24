@@ -56,9 +56,11 @@ def _channel_auth_user_path():
 
 
 def store_channel_authenticated_user_id(channel_identifier, user_id):
+    # For any single run of OmegaClaw, allow only a single save of a user-id or verification    
     global _user_ID_processed
     if _user_ID_processed:
         return False
+    
     """Record an authenticated channel user ID in the memory directory."""
     channel_identifier = str(channel_identifier or "").strip() or "DEFAULT"
     user_id = str(user_id).strip()
@@ -82,11 +84,11 @@ def store_channel_authenticated_user_id(channel_identifier, user_id):
 
 
 def get_channel_saved_user_id(channel_identifier, user_id):
-    global _user_ID_processed
     # For any single run of OmegaClaw, allow only a single save of a user-id or verification    
+    global _user_ID_processed
     if _user_ID_processed:
         return False
-    
+
     channel_identifier = str(channel_identifier or "").strip() or "DEFAULT"
     user_id = str(user_id).strip()
     if not user_id:
