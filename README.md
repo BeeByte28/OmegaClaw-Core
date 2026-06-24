@@ -66,6 +66,21 @@ Install Python dependencies:
 ```
 python3 -m pip install -r ./repos/OmegaClaw-Core/requirements.txt
 ```
+---
+
+## Run OmegaClaw in Docker
+
+Ensure that you have [Docker installed](https://docs.docker.com/engine/install/)
+
+Run OmegaClaw using next command:
+```
+curl -fsSL https://raw.githubusercontent.com/asi-alliance/OmegaClaw-Core/refs/heads/main/scripts/omegaclaw | bash -s -- singularitynet/omegaclaw:latest
+```
+
+To run specific version of OmegaClaw set version in `TAG` environment variable and run the following command:
+```
+export TAG=v0.1.15; curl -fsSL  https://github.com/asi-alliance/OmegaClaw-Core/raw/refs/tags/$TAG/scripts/omegaclaw | bash -s -- singularitynet/omegaclaw:$TAG
+```
 
 ---
 
@@ -80,6 +95,7 @@ Before running the system you need to choose your LLM API provider and export th
 | `ASIOne` | `ASIONE_API_KEY` |  ASI1 Ultra model via ASI:One inference endpoint (`https://api.asi1.ai/v1`). |
 | `Ollama-local` | `OLLAMA_API_KEY` |  Ollama model via local inference endpoint. API endpoint is set via `LLM_SERVER_LOCAL_URL` environment variables. |
 | `OpenRouter` | `OPENROUTER_API_KEY` |  GLM model via OpenRouter inference endpoint. |
+| `MiniMaxM3` | `OPENROUTER_API_KEY` |  MiniMax M3 model via OpenRouter inference endpoint. |
 
 Run the system via the following command which ensures the system is started from the root folder of PeTTa:
 ```
@@ -115,11 +131,7 @@ If you want to skip preloading the knowledge then run `export IMPORT_KB_ON_START
 | `provider` | `Anthropic` | LLM provider, see the table of the providers above |
 | `maxOutputToken` | 6000 | Output cap passed to the provider |
 | `reasoningMode` | `medium` | Reasoning-effort hint passed to the provider (OpenAI only) |
-| `securityPolicyPath` | ./repos/OmegaClaw-Core/profile/policy.yaml | Path to the security profile written using
-[OpenShell
-YAML](https://docs.nvidia.com/openshell/reference/policy-schema#filesystem-policy).
-See [./profile/policy.yaml](./profile/policy.yaml) as an example. Empty value
-disables restrictions. |
+| `securityPolicyPath` | ./repos/OmegaClaw-Core/profile/policy.yaml | Path to the security profile written using [OpenShell YAML](https://docs.nvidia.com/openshell/reference/policy-schema#filesystem-policy). See [./profile/policy.yaml](./profile/policy.yaml) as an example. Empty value disables restrictions. |
 
 ### Memory (`src/memory.metta`)
 
