@@ -111,7 +111,7 @@ COPY --chown=www-data:www-data --chmod=0600 ./proxy/* /opt/nginx/
 ENV OMEGACLAW_DIR=/PeTTa/repos/OmegaClaw-Core
 ENV MEMORY_DIR=${OMEGACLAW_DIR}/memory
 # Start defaults for import-kb
-ENV IMPORT_KB_ON_START=1
+ENV IMPORT_KB_ON_START=0
 
 # Bring in only local OmegaClaw source (filtered by .dockerignore).
 COPY . ${OMEGACLAW_DIR}
