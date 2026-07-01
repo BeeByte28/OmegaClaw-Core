@@ -185,7 +185,7 @@ def _choose_channel():
                     "commchannel": "slack",
                     "SL_BOT_TOKEN": token,
                     "SL_CHANNEL_ID": channel_id,
-                    "SL_POLL_INTERVAL": "10",
+                    "SL_POLL_INTERVAL": "2",
                     "SL_TEAM_NAME": team_name,
                     "SL_CHANNEL_NAME": channel_name,
                 }
@@ -313,7 +313,10 @@ Stop OmegaClaw:
   docker stop omegaclaw
 
 Restart OmegaClaw:
-  --> Simply rerun this script
+  docker start omegaclaw
+
+To switch to a different channel or token:
+  Rerun this script
 
 Examine log file in case of problem:
   docker logs -f omegaclaw
@@ -435,7 +438,7 @@ options() {
     TG_POLL_TIMEOUT="${TG_POLL_TIMEOUT:-20}"
     SL_BOT_TOKEN="${SL_BOT_TOKEN:-}"
     SL_CHANNEL_ID="${SL_CHANNEL_ID:-}"
-    SL_POLL_INTERVAL="${SL_POLL_INTERVAL:-10}"
+    SL_POLL_INTERVAL="${SL_POLL_INTERVAL:-2}"
 
     if [[ "$#" -eq 0 ]]; then
         help
