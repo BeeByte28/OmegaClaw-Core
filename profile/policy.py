@@ -1,8 +1,11 @@
+import os
+import enum
 import yaml
 from py_landlock import Landlock, AccessFs
 from pathlib import Path
-import enum
-import os
+from src.logger import get_logger
+
+logger = get_logger(__name__)
 
 def apply_security_policy(path):
     try:
@@ -11,9 +14,9 @@ def apply_security_policy(path):
             policy.load_file(path)
             policy.apply()
         else:
-            print("[policy.apply_security_policy]: securityPolicyPath is not set")
+            logger.warning("[policy.apply_security_policy]: securityPolicyPath is not set")
     except Exception as e:
-        print(f"[policy.apply_security_policy]: Unexpected exception: {e}")
+        logger.error(f"[policy.apply_security_policy]: Unexpected exception: {e}")
         raise
 
 class LandLockCompatibility(enum.Enum):
@@ -39,7 +42,7 @@ class FileSystemPolicy:
         self._read_write = []
 
     def load_file(self, path: str|Path):
-        print(f"[FileSystemPolicy.load_file] loading policy from file {path}")
+        logger.info(f"[FileSystemPolicy.load_file]: loading policy from file {path}")
         policy = None
         with open(path, "r") as f:
             policy = yaml.safe_load(f)
@@ -93,4 +96,4 @@ class FileSystemPolicy:
             .add_path_rule(*rof, access=FileSystemPolicy.READ_ONLY_FILE_ACCESS) \
             .apply()
 
-        print("[FileSystemPolicy.load_file] policy applied")
+        logger.info("[FileSystemPolicy.load_file]: policy applied")

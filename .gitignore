@@ -22,3 +22,7 @@ Autotests/logs/
 
 # IDE
 .idea/
+
+# logs
+logs/*.log
+logs/*.log.*

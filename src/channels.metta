@@ -13,7 +13,7 @@
 
 ;Connect all the channels:
 (= (initChannels)
-   (progn (println! "Initializing channels")
+   (progn (py-call (logger.log_info "Initializing channels" "channels"))
           (configure commchannel irc)
           (if (== (commchannel) irc)
               (progn (configure IRC_channel ##omegaclaw)

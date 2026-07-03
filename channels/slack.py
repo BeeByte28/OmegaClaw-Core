@@ -7,6 +7,9 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import auth
+from src.logger import get_logger
+
+logger = get_logger(__name__)
 
 _running = False
 _last_message = ""
@@ -95,7 +98,7 @@ def _is_allowed_message(channel_id, user_id, msg):
         if not auth.is_auth_enabled():
             if not _channel_id:
                 _bind_label = _channel_name_cache.get(channel_id, channel_id)
-                print(f"[SLACK] Auto-bound to channel {_bind_label}")
+                logger.info(f"[SLACK] Auto-bound to channel {_bind_label}")
                 _channel_id = channel_id
             return "allow"
         if _authenticated_user_id is not None:
@@ -195,7 +198,7 @@ def _get_display_name(user_id):
         elif username:
             name = username
     except Exception as exc:
-        print(f"[SLACK] Could not resolve user {user_id}: {exc}")
+        logger.warning(f"[SLACK] Could not resolve user {user_id}: {exc}")
 
     with _state_lock:
         _user_cache[user_id] = name
@@ -226,9 +229,9 @@ def _validate_channel():
     _cache_channel(channel)
     channel_name = str(channel.get("name", "")).strip()
     if channel_name:
-        print(f"[SLACK] Channel ready: #{channel_name}")
+        logger.info(f"[SLACK] Channel ready: #{channel_name}")
     else:
-        print(f"[SLACK] Channel ready: {_channel_id}")
+        logger.info(f"[SLACK] Channel ready: {_channel_id}")
 
 
 def _list_joined_channels():
@@ -274,15 +277,15 @@ def _initialize_cursor_for_channel(channel_id):
         with _state_lock:
             _channel_offsets[channel_id] = ts
     except Exception as exc:
-        print(f"[SLACK] Could not initialize cursor for {_channel_label(channel_id)}: {exc}")
+        logger.warning(f"[SLACK] Could not initialize cursor for {_channel_label(channel_id)}: {exc}")
 
 
 def _initialize_auto_bind_cursors():
     channels = _refresh_auto_bind_channels(force=True)
     if not channels:
-        print("[SLACK] Auto-bind waiting: no joined channels visible yet.")
+        logger.warning("[SLACK] Auto-bind waiting: no joined channels visible yet.")
     else:
-        print(f"[SLACK] Auto-bind watching {len(channels)} joined channel(s).")
+        logger.info(f"[SLACK] Auto-bind watching {len(channels)} joined channel(s).")
 
 
 def _refresh_auto_bind_channels(force=False):
@@ -362,7 +365,7 @@ def _poll_channel(channel_id):
 
 def _poll_loop():
     global _connected
-    print("[SLACK] Polling started")
+    logger.info("[SLACK] Polling started")
 
     while _running:
         try:
@@ -394,15 +397,15 @@ def _poll_loop():
             _connected = True
         except _SlackRateLimitError as exc:
             _connected = False
-            print(f"[SLACK] Rate limited. Backing off for {exc.retry_after}s.")
+            logger.warning(f"[SLACK] Rate limited. Backing off for {exc.retry_after}s.")
         except Exception as exc:
             _connected = False
-            print(f"[SLACK] Poll error: {exc}")
+            logger.warning(f"[SLACK] Poll error: {exc}")
 
         time.sleep(max(1, int(_poll_interval)))
 
     _connected = False
-    print("[SLACK] Polling stopped")
+    logger.info("[SLACK] Polling stopped")
 
 
 def start_slack(channel_id, poll_interval=60):
@@ -440,11 +443,11 @@ def start_slack(channel_id, poll_interval=60):
         _validate_channel()
         _initialize_cursor_for_channel(_channel_id)
     else:
-        print("[SLACK] Starting adapter in auto-bind mode (channel not configured).")
+        logger.info("[SLACK] Starting adapter in auto-bind mode (channel not configured).")
         _initialize_auto_bind_cursors()
 
     _running = True
-    print(f"[SLACK] Starting adapter with channel target: {_channel_id or 'auto-bind'}")
+    logger.info(f"[SLACK] Starting adapter with channel target: {_channel_id or 'auto-bind'}")
     t = threading.Thread(target=_poll_loop, daemon=True)
     t.start()
     return t
@@ -470,5 +473,5 @@ def send_message(text):
         try:
             _api_call("chat.postMessage", {"channel": _channel_id, "text": chunk}, timeout=15)
         except Exception as exc:
-            print(f"[SLACK] Send failed: {exc}")
+            logger.error(f"[SLACK] Send failed: {exc}")
             return

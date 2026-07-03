@@ -2,6 +2,39 @@
 
 MeTTa handles reasoning and control flow; bridges handle everything that needs a library ecosystem.
 
+## `src/logger.py`
+
+Centralised logging setup. Called once at startup from `lib_llm_ext.py`; all other Python modules obtain a logger through `get_logger` rather than calling `logging.getLogger` directly.
+
+| Function | Purpose |
+|---|---|
+| `setup_logging()` | Configures the root logger with a stdout handler and a `TimedRotatingFileHandler` that rotates at midnight and keeps 7 days of backups. Idempotent — safe to import from multiple modules. Falls back to stdout-only if the log directory is not writable. |
+| `get_logger(name)` | Returns `logging.getLogger(name)`. Use this instead of calling `logging.getLogger` directly so the relationship to the shared setup is explicit. |
+| `log_debug(msg, module)` | MeTTa bridge — write a DEBUG entry under logger `module`. |
+| `log_info(msg, module)` | MeTTa bridge — write an INFO entry under logger `module`. |
+| `log_warning(msg, module)` | MeTTa bridge — write a WARNING entry under logger `module`. |
+| `log_error(msg, module)` | MeTTa bridge — write an ERROR entry under logger `module`. |
+
+The MeTTa bridge functions are invoked from `.metta` files via `py-call`, passing the source filename as `module` so log lines are attributed correctly:
+
+```metta
+(py-call (logger.log_info "Initializing memory" "memory"))
+```
+
+**Log format** — every line follows:
+
+```
+YYYY-MM-DD HH:MM:SS | LEVEL    | module | message
+```
+
+**Log level** — controlled by the `LOG_LEVEL` environment variable (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`). Defaults to `INFO`. Invalid values are ignored and `INFO` is used.
+
+**Log file** — written to `logs/omegaclaw.log` relative to the repository root, rotated nightly. The `logs/` directory must be writable by the process user. When running in Docker the `entrypoint.sh` sets ownership of `logs/` to `nobody` (uid 65534) before the agent starts. If you mount a host directory over `logs/`, ensure it is writable by the same user:
+
+```bash
+mkdir -p ./logs && chown 65534:65534 ./logs
+```
+
 ## `lib_llm_ext.py`
 
 LLM and embedding bridges.
