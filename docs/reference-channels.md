@@ -59,10 +59,6 @@ Slack adapter using Slack Web API polling.
 - Adapter respects Slack `Retry-After` backoff on HTTP 429 and enforces a minimum 60s poll interval.
 - Uses the same one-time `auth <secret>` ownership gate as the other adapters.
 
-## `channels/websearch.py`
-
-Not a communication channel in the `send`/`receive` sense — this is the backend for the `search` skill. Exposes `search(query)`.
-
 ## Adding a new channel
 
 See [tutorial-04-adding-a-channel.md](./tutorial-04-adding-a-channel.md).
