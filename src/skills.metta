@@ -11,7 +11,7 @@
     "- Append line to file: append-file filename string",
     ;COMMUNICATION CHANNELS:
     "- Send message to user: send string"
-    "- Search the web: search string"
+    "- Search the web: websearch string"
     "- Search the web using the Tavily Search Agent: tavily-search string"
     "- Get technical analysis for a stock ticker using the Technical Analysis Agent: technical-analysis ticker"
     ;CODE EXECUTION:
@@ -53,6 +53,9 @@
 
 (= (technical-analysis $ticker)
    (py-call (agentverse.technical_analysis $ticker)))
+
+(= (websearch $msg)
+   (py-call (websearch.search $msg)))
 
 !(import_prolog_functions_from_file (library OmegaClaw-Core ./src/skills.pl) (shell first_char gc read_file_tail))
 
