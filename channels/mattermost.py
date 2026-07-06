@@ -65,13 +65,13 @@ def _is_allowed_message(user_id, msg):
             return "allow"
         if _authenticated_user_id is not None:
             return "allow" if user_id == _authenticated_user_id else "ignore"
-        if not _is_auth_command(msg):
-            return "ignore"
         candidate = _parse_auth_candidate(msg)
-        if auth.verify_token(candidate):
+        user_id_check = auth.authenticate_channel_user('MATTERMOST', user_id, candidate)
+        if user_id_check in ["auth_bound", "allow"]:
             _authenticated_user_id = user_id
-            return "auth_bound"
-        return "ignore"
+            return user_id_check
+        else:
+            return "ignore"
 
 def _get_display_name(user_id):
     r = requests.get(
