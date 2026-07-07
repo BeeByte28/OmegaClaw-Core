@@ -33,7 +33,12 @@ def setup_logging(config_path: str | None = None) -> None:
     If the selected config file does not exist, fall back to basic stderr logging.
     """
 
-    path = DEFAULT_LOG_CONFIG if _is_empty_config_path(config_path) else Path(str(config_path))
+    if _is_empty_config_path(config_path):
+        path = DEFAULT_LOG_CONFIG
+    else:
+        path = Path(str(config_path))
+        if not path.exists():
+            path = DEFAULT_LOG_CONFIG
 
     if path.exists():
         logging.config.fileConfig(
@@ -52,7 +57,6 @@ def setup_logging(config_path: str | None = None) -> None:
         "Logging config file %s not found; using basic logging fallback.",
         path,
     )
-
 
 def get_logger(name: str) -> logging.Logger:
     return logging.getLogger(name)
