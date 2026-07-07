@@ -185,7 +185,7 @@ def _choose_channel():
                     "commchannel": "slack",
                     "SL_BOT_TOKEN": token,
                     "SL_CHANNEL_ID": channel_id,
-                    "SL_POLL_INTERVAL": "10",
+                    "SL_POLL_INTERVAL": "2",
                     "SL_TEAM_NAME": team_name,
                     "SL_CHANNEL_NAME": channel_name,
                 }
@@ -239,13 +239,13 @@ def _choose_provider():
 def _choose_import_kb():
     while True:
         c = input(
-            "Import knowledge base on startup? Will improve results but takes about 30 minutes. [Y/n]: "
+            "Import knowledge base on startup? Will improve results but takes about 30 minutes. [y/N]: "
         ).strip().lower()
 
-        if c in ("", "y", "yes"):
+        if c in ("y", "yes"):
             return "1"
 
-        if c in ("n", "no"):
+        if c in ("", "n", "no"):
             return "0"
 
         if c == "q":
@@ -313,7 +313,10 @@ Stop OmegaClaw:
   docker stop omegaclaw
 
 Restart OmegaClaw:
-  --> Simply rerun this script
+  docker start omegaclaw
+
+To switch to a different channel or token:
+  Rerun this script
 
 Examine log file in case of problem:
   docker logs -f omegaclaw
@@ -436,7 +439,7 @@ options() {
     TG_POLL_TIMEOUT="${TG_POLL_TIMEOUT:-20}"
     SL_BOT_TOKEN="${SL_BOT_TOKEN:-}"
     SL_CHANNEL_ID="${SL_CHANNEL_ID:-}"
-    SL_POLL_INTERVAL="${SL_POLL_INTERVAL:-10}"
+    SL_POLL_INTERVAL="${SL_POLL_INTERVAL:-2}"
     log_config_path=""
 
     if [[ "$#" -eq 0 ]]; then
@@ -536,16 +539,7 @@ start() {
             -e "SL_BOT_TOKEN=${SL_BOT_TOKEN:-}"
             -e OMEGACLAW_AUTH_SECRET="$OMEGACLAW_AUTH_SECRET"
             -e LLM_SERVER_LOCAL_URL="$llm_server_local_url"
-            -e IMPORT_KB_ON_START="${IMPORT_KB_ON_START:-1}"
-    )
-
-    if [ -n "${container_log_config_path}" ]; then
-        docker_cmd+=(
-            --mount "type=bind,source=${log_config_abs},target=${container_log_config_path},readonly"
-        )
-    fi
-
-    docker_cmd+=(
+            -e IMPORT_KB_ON_START="${IMPORT_KB_ON_START:-0}"
             "$image"
             "commchannel=${commchannel}"
             "provider=${provider}"

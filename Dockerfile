@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 # For maximum integrity, set this to an immutable digest in CI/CD.
-ARG SWIPL_IMAGE=docker.io/library/swipl:9.2.4
+ARG SWIPL_IMAGE=docker.io/library/swipl:10.0.2
 
 FROM ${SWIPL_IMAGE} AS builder
 
@@ -55,7 +55,8 @@ RUN mkdir -p /PeTTa/repos \
 COPY ./requirements.txt /tmp/requirements.txt
 RUN python3 -m pip install --no-cache-dir --break-system-packages \
     --index-url https://download.pytorch.org/whl/cpu \
-    torch==2.5.1 \
+    --extra-index-url https://pypi.org/simple/ \
+    torch==2.12.1 \
  && python3 -m pip install --no-cache-dir --break-system-packages -r /tmp/requirements.txt
 
 # Pre-download the sentence-transformers model so runtime does not need network access.
@@ -111,7 +112,7 @@ COPY --chown=www-data:www-data --chmod=0600 ./proxy/* /opt/nginx/
 ENV OMEGACLAW_DIR=/PeTTa/repos/OmegaClaw-Core
 ENV MEMORY_DIR=${OMEGACLAW_DIR}/memory
 # Start defaults for import-kb
-ENV IMPORT_KB_ON_START=1
+ENV IMPORT_KB_ON_START=0
 
 # Bring in only local OmegaClaw source (filtered by .dockerignore).
 COPY . ${OMEGACLAW_DIR}

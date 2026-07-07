@@ -67,13 +67,13 @@ def _is_allowed_message(nick, msg):
             return "allow"
         if _authenticated_nick is not None:
             return "allow" if norm_nick == _authenticated_nick else "ignore"
-        if not _is_auth_command(msg):
-            return "ignore"
         candidate = _parse_auth_candidate(msg)
-        if auth.verify_token(candidate):
+        user_id_check = auth.authenticate_channel_user('IRC', norm_nick, candidate)
+        if user_id_check in ["auth_bound", "allow"]:
             _authenticated_nick = norm_nick
-            return "auth_bound"
-        return "ignore"
+            return user_id_check
+        else:
+            return "ignore"
 
 def _irc_loop(channel, server, port, nick):
     global _running, _sock, _connected

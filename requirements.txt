@@ -1,6 +1,5 @@
-torch==2.5.1
+torch==2.12.1
 chromadb==1.5.9
-janus-swi==1.5.2
 openai==2.38.0
 uagents==0.25.1
 transformers==5.8.0
