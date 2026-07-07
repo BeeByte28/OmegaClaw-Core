@@ -6,7 +6,7 @@
 (= (embeddingprovider) (empty))
 
 (= (initMemory)
-   (progn (py-call (logger.log_info "Initializing memory" "memory"))
+   (progn (log INFO "memory" "Initializing memory")
           (configure maxFeedback 50000)
           (configure maxRecallItems 20)
           (configure maxEpisodeRecallLines 20)

@@ -252,5 +252,5 @@ def send_message(text):
                 use_post=True,
             )
         except Exception as exc:
-            logger.error(f"Send failed: {exc}")
+            logger.exception(f"Send failed: {exc}")
             return

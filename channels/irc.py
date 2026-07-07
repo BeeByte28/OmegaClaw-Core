@@ -83,7 +83,7 @@ def _irc_loop(channel, server, port, nick):
         sock.settimeout(60)
         logger.info("TCP connected")
     except OSError as e:
-        logger.error(f"Connect failed: {e}")
+        logger.exception(f"Connect failed: {e}")
         return
     _sock = sock
     _send(f"NICK {nick}")
@@ -112,9 +112,9 @@ def _irc_loop(channel, server, port, nick):
                 logger.info(f"Registered. Joining {_channel}")
                 _send(f"JOIN {_channel}")
             elif len(parts) > 1 and parts[1] in {"403", "405", "471", "473", "474", "475"}:
-                logger.error(f"Join failed: {line}")
+                logger.exception(f"Join failed: {line}")
             elif len(parts) > 1 and parts[1] == "433":
-                logger.error(f"Nickname in use: {line}")
+                logger.exception(f"Nickname in use: {line}")
             elif line.startswith(":") and " PRIVMSG " in line:
                 try:
                     prefix, trailing = line[1:].split(" PRIVMSG ", 1)
@@ -130,7 +130,7 @@ def _irc_loop(channel, server, port, nick):
                     elif state == "auth_bound":
                         _send(f"PRIVMSG {_channel} :Authentication successful for {nick}.")
                 except Exception as e:
-                    logger.error(f"[IRC]: exception caught {repr(e)}")
+                    logger.exception(f"[IRC]: exception caught {repr(e)}")
     _connected = False
     with _sock_lock:
         _sock = None
@@ -164,4 +164,4 @@ def send_message(text):
             if _connected and _channel:
                  _send(f"PRIVMSG {_channel} :{chunk}")
         except Exception as e:
-            logger.error(f"error in send_message on channel {_channel}: {e}")
+            logger.exception(f"error in send_message on channel {_channel}: {e}")

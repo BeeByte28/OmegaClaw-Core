@@ -45,7 +45,7 @@ class AIProvider(AbstractAIProvider):
         if proxy_url:
             prefix = self._name.lower()
             base_url = f"{proxy_url.rstrip('/')}/{prefix}/"
-            logger.debug(f"[lib_llm_ext.AIProvider._create_client]: Connecting via proxy: {base_url}")
+            logger.info(f"[lib_llm_ext.AIProvider._create_client]: Connecting via proxy: {base_url}")
             return openai.OpenAI(
                     api_key="proxy",
                     base_url=base_url,
@@ -87,7 +87,7 @@ class AIProvider(AbstractAIProvider):
             _log_raw(self._name, self._model_name, raw)
             return self._clean_text(raw)
         except Exception as e:
-            logger.error(f"[lib_llm_ext.AIProvider.chat]: Exception while communicating with LLM: {e}")
+            logger.exception(f"[lib_llm_ext.AIProvider.chat]: Exception while communicating with LLM: {e}")
             return ""
 
     def _clean_text(self, text: str) -> str:
@@ -102,7 +102,7 @@ class OpenRouterProvider(AIProvider):
         proxy_url = os.environ.get("GATEWAY_URL")
         if proxy_url:
             base_url = f"{proxy_url.rstrip('/')}/openrouter/"
-            logger.debug(f"[lib_llm_ext.OpenRouterProvider._create_client]: Connecting via proxy: {base_url}")
+            logger.info(f"[lib_llm_ext.OpenRouterProvider._create_client]: Connecting via proxy: {base_url}")
             return openai.OpenAI(
                     api_key="proxy",
                     base_url=base_url,
@@ -154,7 +154,7 @@ class AsiOneProvider(AIProvider):
             resp = resp.replace("</arg_value>", " ").replace("</tool_call>", " ").replace("<arg_value>", " ").replace("<tool_call>", " ")
             return resp
         except Exception as e:
-            logger.error(f"[lib_llm_ext.ASIOneProvider.chat]: Exception while communicating with LLM: {e}")
+            logger.exception(f"[lib_llm_ext.ASIOneProvider.chat]: Exception while communicating with LLM: {e}")
             return ""
 
 
@@ -189,7 +189,7 @@ class OpenAIProvider(AIProvider):
             _log_raw(self._name, self._model_name, raw)
             return self._clean_text(raw)
         except Exception as e:
-            logger.error(f"[lib_llm_ext.OpenAIProvider.chat]: Exception while communicating with LLM: {e}")
+            logger.exception(f"[lib_llm_ext.OpenAIProvider.chat]: Exception while communicating with LLM: {e}")
             return ""
 
 

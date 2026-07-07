@@ -16,7 +16,7 @@ def apply_security_policy(path):
         else:
             logger.warning("SecurityPolicyPath is not set")
     except Exception as e:
-        logger.error(f"Unexpected exception: {e}")
+        logger.exception(f"Unexpected exception: {e}")
         raise
 
 class LandLockCompatibility(enum.Enum):

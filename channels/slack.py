@@ -473,5 +473,5 @@ def send_message(text):
         try:
             _api_call("chat.postMessage", {"channel": _channel_id, "text": chunk}, timeout=15)
         except Exception as exc:
-            logger.error(f"Send failed: {exc}")
+            logger.exception(f"Send failed: {exc}")
             return

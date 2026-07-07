@@ -288,5 +288,5 @@ def init_knowledge(embedding_selection):
         return f"Knowledge: {total} files ({unchanged} unchanged, {reindexed} re-indexed)"
 
     except Exception as e:
-        logger.error(f"Knowledge init failed: {e}", exc_info=True)
+        logger.exception(f"Knowledge init failed: {e}", exc_info=True)
         return f"Knowledge init failed: {e}"

@@ -280,7 +280,6 @@ def config_run_omegaclaw(config_output_path):
 
     channel_config = _choose_channel()
     provider, embeddingprovider, api_token_var, llm_server_local_url = _choose_provider()
-    import_kb_on_start = _choose_import_kb()
     token = _prompt_llm_token()
     import_kb_on_start = _choose_import_kb()
 
