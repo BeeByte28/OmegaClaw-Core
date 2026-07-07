@@ -61,6 +61,9 @@ import threading
 import time
 import uuid
 from collections import deque
+from src.logger import get_logger
+
+logger = get_logger(__name__)
 
 _running = False
 _thread = None
@@ -76,10 +79,6 @@ _ws_token = ""
 _inbox = deque(maxlen=256)
 _outbox = deque(maxlen=100)
 _last_seen_seq = None
-
-
-def _log(message):
-    print(f"[WS] {message}")
 
 
 def _ensure_websockets_available():
@@ -168,11 +167,11 @@ def _handle_frame(raw_message):
     try:
         frame = json.loads(raw_message)
     except json.JSONDecodeError:
-        _log(f"Ignoring non-JSON frame: {raw_message!r}")
+        logger.warning(f"Ignoring non-JSON frame: {raw_message!r}")
         return
 
     if not isinstance(frame, dict):
-        _log(f"Ignoring unexpected frame payload: {frame!r}")
+        logger.warning(f"Ignoring unexpected frame payload: {frame!r}")
         return
 
     frame_type = frame.get("type")
@@ -180,20 +179,20 @@ def _handle_frame(raw_message):
         seq = frame.get("seq")
         text = frame.get("text")
         if not isinstance(seq, int) or not isinstance(text, str):
-            _log(f"Ignoring malformed user_message frame: {frame!r}")
+            logger.warning(f"Ignoring malformed user_message frame: {frame!r}")
             return
         _enqueue_user_message(seq, text)
         return
 
     if frame_type == "ack":
-        _log(f"Ack received for seq={frame.get('seq')} client_seq={frame.get('client_seq')}")
+        logger.info(f"Ack received for seq={frame.get('seq')} client_seq={frame.get('client_seq')}")
         return
 
     if frame_type == "error":
-        _log(f"Server error {frame.get('code')}: {frame.get('message')}")
+        logger.error(f"Server error {frame.get('code')}: {frame.get('message')}")
         return
 
-    _log(f"Ignoring unsupported frame type: {frame_type!r}")
+    logger.warning(f"Ignoring unsupported frame type: {frame_type!r}")
 
 
 def _drain_outbox(ws):
@@ -221,7 +220,7 @@ def _listen_once(ws):
 
 def _listener_loop():
     backoff_seconds = 1.0
-    _log(f"Starting adapter for {_ws_url}")
+    logger.info(f"Starting adapter for {_ws_url}")
 
     while _running:
         active_ws = None
@@ -229,7 +228,7 @@ def _listener_loop():
             with _connect_client(_ws_url, _ws_token) as ws:
                 active_ws = ws
                 _set_connection(ws)
-                _log("Connected")
+                logger.info("Connected")
                 backoff_seconds = 1.0
                 _listen_once(ws)
         except Exception as exc:
@@ -240,13 +239,13 @@ def _listener_loop():
 
             delay = min(backoff_seconds, 30.0)
             delay += random.uniform(0.0, delay * 0.2)
-            _log(f"Connection error: {exc}. Reconnecting in {delay:.1f}s")
+            logger.exception(f"Connection error: {exc}. Reconnecting in {delay:.1f}s")
             time.sleep(delay)
             backoff_seconds = min(backoff_seconds * 2.0, 30.0)
         finally:
             _clear_connection(active_ws)
 
-    _log("Adapter stopped")
+    logger.info("Adapter stopped")
 
 
 def start_websocket(ws_url=None, ws_token=None):
@@ -256,7 +255,7 @@ def start_websocket(ws_url=None, ws_token=None):
         _ensure_websockets_available()
         _ws_url, _ws_token = _resolve_connection_inputs(ws_url, ws_token)
     except Exception as exc:
-        _log(f"WebSocket channel disabled: {exc}")
+        logger.exception(f"WebSocket channel disabled: {exc}")
         return None
 
     _clear_connection()
@@ -280,7 +279,7 @@ def stop_websocket():
     try:
         active_ws.close()
     except Exception as exc:
-        _log(f"Error while closing websocket: {exc}")
+        logger.exception(f"Error while closing websocket: {exc}")
 
 
 def getLastMessage():
@@ -320,6 +319,6 @@ def send_message(text):
     try:
         _send_json(payload, ws=active_ws)
     except Exception as exc:
-        _log(f"Send failed, buffering for reconnect: {exc}")
+        logger.exception(f"Send failed, buffering for reconnect: {exc}")
         with _msg_lock:
             _outbox.append(payload)
