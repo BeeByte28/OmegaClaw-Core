@@ -14,14 +14,6 @@ for arg in "$@"; do
   fi
 done
 
-if [ -r /etc/omegaclaw/version ]; then
-    echo "OmegaClaw version: $(cat /etc/omegaclaw/version)"
-elif [ -n "${OMEGACLAW_VERSION:-}" ]; then
-    echo "OmegaClaw version: ${OMEGACLAW_VERSION}"
-else
-    echo "OmegaClaw version: unknown"
-fi
-
 # Optional knowledge-base import
 if [[ "${IMPORT_KB_ON_START}" == "1" ]]; then
   su nobody -s /bin/sh -c "${OMEGACLAW_DIR}/scripts/import_knowledge.sh"

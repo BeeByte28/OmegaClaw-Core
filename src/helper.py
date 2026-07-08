@@ -260,7 +260,7 @@ def omegaclaw_version() -> str:
                 text=True,
                 timeout=3,
             )
-            version = result.stdout.strip()
+            version = str(result.stdout.strip())
             if version:
                 return version
         except Exception:
