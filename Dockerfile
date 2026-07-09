@@ -122,6 +122,7 @@ RUN cp ${OMEGACLAW_DIR}/run.metta /PeTTa/run.metta \
  && ln -s ${MEMORY_DIR}/chroma_db ./chroma_db \
  && chmod +x ${OMEGACLAW_DIR}/entrypoint.sh \
  && chmod +x ${OMEGACLAW_DIR}/scripts/import_knowledge.sh \
+ && chmod +x ${OMEGACLAW_DIR}/scripts/omegaclaw \
  && chown -R 65534:65534 ${MEMORY_DIR} \
  && find ${MEMORY_DIR} -type f -exec chmod 0644 {} \; \
  && chmod 0444 ${MEMORY_DIR}/prompt.txt \
