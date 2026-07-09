@@ -15,6 +15,7 @@ cat >"$tmp_py_file" <<'PY'
 import getpass
 import json
 import secrets
+import string
 import shlex
 import shutil
 import sys
@@ -309,7 +310,7 @@ def config_run_omegaclaw(config_output_path):
     with open(config_output_path, "w", encoding="utf-8") as f:
         _write_kv(f, "api_token_var", api_token_var)
         _write_kv(f, "api_token", token)
-        _write_kv(f, "OMEGACLAW_AUTH_SECRET", secrets.token_urlsafe(24))
+        _write_kv(f, "OMEGACLAW_AUTH_SECRET", "".join(secrets.choice(string.digits) for _ in range(6)))
         _write_kv(f, "provider", provider)
         _write_kv(f, "embeddingprovider", embeddingprovider)
         _write_kv(f, "llm_server_local_url", llm_server_local_url)
