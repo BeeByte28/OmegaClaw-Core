@@ -456,20 +456,6 @@ start
 
 }
 
-version() {
-    script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-
-    if repo_root="$(git -C "$script_dir" rev-parse --show-toplevel 2>/dev/null)"; then
-        if version="$(git -C "$repo_root" describe --tags --dirty --always 2>/dev/null)"; then
-            printf "OmegaClaw %s\n" "$version"
-            return 0
-        fi
-    fi
-
-    echo "OmegaClaw unknown"
-    return 1
-}
-
 help() {
     echo -e "Usage: ${0} [<image tag> | command [options]]"
     echo
@@ -489,7 +475,6 @@ help() {
     echo -e "\t-c <IRC channel> set IRC channel"
     echo -e "\t-t <channel type> set communication channel type: irc|telegram|slack|websocket|mattermost|test"
     echo -e "\t-d <Docker image> set Docker image name (default omegaclaw:latest)"
-    echo -e "\t--version |-v show version"
 }
 
 options() {
@@ -634,8 +619,7 @@ case "${command}" in
     start) start ;;
     stop) stop ;;
     clean) clean ;;
-    --version|-v) version ;;
-    -h|--help) help ;;
+    -h) help ;;
     *) image="${command}"
        bootstrap
        ;;
