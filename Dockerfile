@@ -71,15 +71,12 @@ PY
 
 FROM ${SWIPL_IMAGE} AS runtime
 
-ARG OMEGACLAW_VERSION=unknown
-
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     HF_HOME=/opt/huggingface \
-    SENTENCE_TRANSFORMERS_HOME=/opt/sentence_transformers \
-    OMEGACLAW_VERSION=${OMEGACLAW_VERSION}
+    SENTENCE_TRANSFORMERS_HOME=/opt/sentence_transformers
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
@@ -119,10 +116,6 @@ ENV IMPORT_KB_ON_START=0
 
 # Bring in only local OmegaClaw source (filtered by .dockerignore).
 COPY . ${OMEGACLAW_DIR}
-
-RUN mkdir -p /etc/omegaclaw \
- && printf '%s\n' "${OMEGACLAW_VERSION}" > /etc/omegaclaw/version \
- && chmod 0444 /etc/omegaclaw/version
 
 RUN cp ${OMEGACLAW_DIR}/run.metta /PeTTa/run.metta \
  && mkdir -p ${MEMORY_DIR}/chroma_db \

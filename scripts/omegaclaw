@@ -415,18 +415,6 @@ version() {
             return 0
         fi
     fi
-    if [ -r /etc/omegaclaw/version ]; then
-        version="$(cat /etc/omegaclaw/version)"
-        if [ -n "$version" ]; then
-            printf "OmegaClaw %s\n" "$version"
-            return 0
-        fi
-    fi
-
-    if [ -n "${OMEGACLAW_VERSION:-}" ]; then
-        printf "OmegaClaw %s\n" "$OMEGACLAW_VERSION"
-        return 0
-    fi
 
     echo "OmegaClaw unknown"
     return 1
