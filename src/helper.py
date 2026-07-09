@@ -1,12 +1,7 @@
+from collections import deque
 import json
 import re
-import os
-import subprocess
-from collections import deque
 from datetime import datetime
-from pathlib import Path
-from typing import Iterable
-
 
 TS_RE = re.compile(r'^\("(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})"')
 LLM_COMMANDS = {
@@ -209,64 +204,6 @@ def normalize_string(x):
         return str(x).encode("utf-8", errors="ignore").decode("utf-8", errors="ignore")
     except Exception:
         return str(x)
-
-def _candidate_scripts() -> Iterable[Path]:
-    explicit_script = os.environ.get("OMEGACLAW_SCRIPT")
-    if explicit_script:
-        yield Path(explicit_script)
-
-    explicit_dir = os.environ.get("OMEGACLAW_DIR")
-    if explicit_dir:
-        yield Path(explicit_dir) / "scripts" / "omegaclaw"
-
-    yield Path("/PeTTa/repos/OmegaClaw-Core/scripts/omegaclaw")
-
-    try:
-        yield Path(__file__).resolve().parents[1] / "scripts" / "omegaclaw"
-    except IndexError:
-        return
-
-
-def _find_omegaclaw_script() -> Path | None:
-    for script in _candidate_scripts():
-        if script.is_file():
-            return script
-    return None
-
-
-def _read_baked_version() -> str | None:
-    version_file = Path("/etc/omegaclaw/version")
-    if version_file.is_file():
-        version = version_file.read_text(encoding="utf-8").strip()
-        if version:
-            return f"OmegaClaw {version}"
-
-    version = os.environ.get("OMEGACLAW_VERSION", "").strip()
-    if version:
-        return f"OmegaClaw {version}"
-
-    return None
-
-def omegaclaw_version() -> str:
-    script = _find_omegaclaw_script()
-
-    if script is not None:
-        try:
-            result = subprocess.run(
-                [str(script), "--version"],
-                check=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
-                text=True,
-                timeout=3,
-            )
-            version = str(result.stdout.strip())
-            if version:
-                return version
-        except Exception:
-            pass
-
-    return _read_baked_version() or "OmegaClaw unknown"
 
 
 def test_balance_parenthesis():
