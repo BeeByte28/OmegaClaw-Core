@@ -104,5 +104,5 @@ See [tutorial-04-adding-a-channel.md](./tutorial-04-adding-a-channel.md).
 
 ## Related reference
 
-- [reference-skills-communication.md](./reference-skills-communication.md) — the MeTTa surface (`send`, `receive`, `search`).
+- [reference-skills-communication.md](./reference-skills-communication.md) — the MeTTa surface (`send`, `receive`, `websearch`).
 - [reference-configuration.md](./reference-configuration.md) — channel parameters.

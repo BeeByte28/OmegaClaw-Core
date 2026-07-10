@@ -1,11 +1,49 @@
-import os, time
+import os, time, hashlib
 import openai
-from typing import Optional
+from typing import Optional, Tuple, Dict, Any
+
+PROMPT_DELIMITER = ":-:-:-:"
+
 
 def _log_raw(provider: str, model: str, raw: str) -> None:
     ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
     print(f"[LLM_RAW] ts={ts} provider={provider} model={model} chars={len(raw or '')} raw={raw!r}")
 
+
+def _split_system_user(content: str) -> Tuple[str, str]:
+    """
+    MeTTa sends:
+        <system/context> :-:-:-: <last human/wakeup message>
+
+    Keep the split intact so providers receive a real system prompt.
+    """
+    if PROMPT_DELIMITER not in content:
+        return "", content.strip()
+
+    sysmsg, _, usermsg = content.partition(PROMPT_DELIMITER)
+    sysmsg = sysmsg.strip()
+    usermsg = usermsg.strip()
+
+    if not usermsg:
+        usermsg = "EMPTY / NO NEW USER INPUT."
+
+    return sysmsg, usermsg
+
+def _stable_cache_key(provider: str, model: str, sysmsg: str) -> str:
+    """
+    Stable key for requests sharing the same system-prefix family.
+    Do not include the user message here.
+    """
+    marker = " LAST_SKILL_USE_RESULTS: "
+    stable = sysmsg.split(marker, 1)[0].strip()
+    digest = hashlib.sha256(stable.encode("utf-8")).hexdigest()[:24]
+    return f"{provider.lower()}:{model}:{digest}"
+
+
+def _merge_dicts(base: Optional[Dict[str, Any]], extra: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    merged = dict(base or {})
+    merged.update(extra or {})
+    return merged
 
 class AbstractAIProvider:
     def __init__(self, name: str):
@@ -65,6 +103,17 @@ class AIProvider(AbstractAIProvider):
         """Check if provider is configured (without initializing)."""
         return bool(os.environ.get("GATEWAY_URL")) or bool(os.environ.get(self._var_name))
 
+    def _build_messages(self, content: str):
+        sysmsg, usermsg = _split_system_user(content)
+
+        if sysmsg:
+            return [
+                {"role": "system", "content": sysmsg},
+                {"role": "user", "content": usermsg},
+            ]
+
+        return [{"role": "user", "content": usermsg}]
+
     def chat(self, content: str, max_tokens: int = 6000, reasoning: str = "medium", **kwargs) -> str:
         """Send chat request, initializing client if needed."""
         self._ensure_client()
@@ -72,25 +121,26 @@ class AIProvider(AbstractAIProvider):
         if self._client is None:
             raise RuntimeError(f"{self.name} not configured (set {self._var_name})")
 
-        content = content.replace(":-:-:-:", " ")
         try:
             response = self._client.chat.completions.create(
                 model=self._model_name,
-                messages=[{"role": "user", "content": content}],
+                messages=self._build_messages(content),
                 max_tokens=max_tokens,
                 **kwargs
             )
 
             raw = response.choices[0].message.content or ""
             _log_raw(self._name, self._model_name, raw)
-            return self._clean_text(raw)
+            resp = self._clean_text(raw)
+            return resp
         except Exception as e:
             print(f"[lib_llm_ext.AIProvider.chat] Exception while communicating with LLM: {e}")
             return ""
 
     def _clean_text(self, text: str) -> str:
         """Unescape special characters."""
-        return text.replace("_quote_", '"').replace("_apostrophe_", "'")
+        return text.replace("_quote_", '"').replace("_apostrophe_", "'").replace("</arg_value>", " ") \
+                    .replace("</tool_call>", " ").replace("<arg_value>", " ").replace("<tool_call>", " ")
 
 class OpenRouterProvider(AIProvider):
     """OpenRouter provider with reasoning mode enabled (reasoning tokens excluded from the response)."""
@@ -109,15 +159,52 @@ class OpenRouterProvider(AIProvider):
             return openai.OpenAI(api_key=os.environ.get(self._var_name), base_url=self._base_url)
 
         return None
+    
+    def _openrouter_extra_body(self, content: str, max_tokens: int) -> Dict[str, Any]:
+        sysmsg, _ = _split_system_user(content)
 
-    def chat(self, content: str, max_tokens: int = 6000, reasoning: str = "medium", **kwargs) -> str:
-        return super().chat(content, max_tokens, reasoning, extra_body={
+        body = {
             "reasoning": {
                 "enabled": True,
-                "max_tokens": 6000,
+                "max_tokens": max_tokens,
                 "exclude": True,
             }
-        }, **kwargs)
+        }
+
+        # Helps OpenRouter sticky-route requests for better cache locality.
+        # Keep this stable per agent/session.
+        session_id = os.environ.get("OPENROUTER_SESSION_ID")
+        if not session_id and sysmsg:
+            session_id = _stable_cache_key("openrouter", self._model_name, sysmsg)
+
+        if session_id:
+            body["session_id"] = session_id[:256]
+
+        model = self._model_name.lower()
+
+        # OpenRouter supports top-level cache_control for Anthropic Claude routes.
+        if model.startswith("anthropic/"):
+            body["cache_control"] = {
+                "type": "ephemeral",
+                "ttl": os.environ.get("OPENROUTER_CACHE_TTL", "5m"),
+            }
+
+        return body
+
+
+    def chat(self, content: str, max_tokens: int = 6000, reasoning: str = "medium", **kwargs) -> str:
+        extra_body = _merge_dicts(
+            self._openrouter_extra_body(content, max_tokens),
+            kwargs.pop("extra_body", None),
+        )
+
+        return super().chat(
+            content=content,
+            max_tokens=max_tokens,
+            reasoning=reasoning,
+            extra_body=extra_body,
+            **kwargs,
+        )
 
 class AsiOneProvider(AIProvider):
     """Lazy AI provider with on-demand initialization."""
@@ -149,7 +236,6 @@ class AsiOneProvider(AIProvider):
             raw = response.choices[0].message.content
             _log_raw(self._name, self._model_name, raw)
             resp = self._clean_text(raw)
-            resp = resp.replace("</arg_value>", " ").replace("</tool_call>", " ").replace("<arg_value>", " ").replace("<tool_call>", " ")
             return resp
         except Exception as e:
             print(f"[lib_llm_ext.ASIOneProvider.chat] Exception while communicating with LLM: {e}")
@@ -166,24 +252,40 @@ class OpenAIProvider(AIProvider):
         if self._client is None:
             raise RuntimeError(f"{self.name} not configured (set {self._var_name})")
 
-        if ":-:-:-:" in content:
-            sysmsg, usermsg = content.split(":-:-:-:", 1)
-        else:
-            sysmsg, usermsg = "", content
-        usermsg = usermsg.strip()
-        if not usermsg:
-            usermsg = "EMPTY / NO NEW USER INPUT."
-        try:
-            response = self._client.responses.create(
-                model=self._model_name,
-                instructions=sysmsg,
-                input=usermsg,
-                max_output_tokens=max_tokens,
-                reasoning={"effort": reasoning},
-                **kwargs
-            )
+        sysmsg, usermsg = _split_system_user(content)
 
-            raw = response.output_text
+        try:
+            create_kwargs = {
+                "instructions": sysmsg,
+                "model": self._model_name,
+                "input": usermsg,
+                "max_output_tokens": max_tokens,
+                "reasoning": {"effort": reasoning},
+                "prompt_cache_key": os.environ.get("OPENAI_PROMPT_CACHE_KEY", _stable_cache_key("openai", self._model_name, sysmsg)),
+            }
+            # GPT-5.5 supports only 24h; GPT-5.4 also supports extended retention.
+            if self._model_name.startswith(("gpt-5.5", "gpt-5.4")):
+                create_kwargs["prompt_cache_retention"] = "24h"
+
+            create_kwargs.update(kwargs)
+
+            response = self._client.responses.create(**create_kwargs)
+
+            usage = getattr(response, "usage", None)
+            if usage:
+                input_tokens = getattr(usage, "input_tokens", None)
+                output_tokens = getattr(usage, "output_tokens", None)
+                total_tokens = getattr(usage, "total_tokens", None)
+                details = getattr(usage, "input_tokens_details", None)
+                cached_tokens = getattr(details, "cached_tokens", None) if details else None
+
+                print(
+                    f"[LLM_USAGE] provider={self._name} model={self._model_name} "
+                    f"input_tokens={input_tokens} output_tokens={output_tokens} "
+                    f"total_tokens={total_tokens} cached_tokens={cached_tokens}"
+                )
+
+            raw = response.output_text or ""
             _log_raw(self._name, self._model_name, raw)
             return self._clean_text(raw)
         except Exception as e:

@@ -46,6 +46,15 @@ Prolog helpers imported via `import_prolog_functions_from_file`.
 | `shell/2` | Run a shell command and capture stdout. Rejects apostrophes. |
 | `first_char/2` | Return the first character of a string — used by the loop to detect whether the LLM produced a valid s-expression. |
 
+## `src/websearch.py`
+
+A python helper for using ddgs to expose websearch to the agent.
+
+| Function | Purpose |
+|---|---|
+| `search_(query, max_results=10)` | Performs a DuckDuckGo text search using `DDGS` and returns a list of result dictionaries containing `title`, `url`, and `snippet`.                                             |
+| `search(query, max_results=10)`  | Wraps `search_` and formats the search results into a MeTTa-like parenthesized string containing each result’s title and snippet. Returns an empty string if the search fails. |
+
 ## Calling conventions
 
 - MeTTa to Python: `(py-call (module.function arg1 arg2 ...))`.
