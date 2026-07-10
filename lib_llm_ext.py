@@ -1,14 +1,16 @@
-import os, time, hashlib
+import os, hashlib
 import openai
 from typing import Optional, Tuple, Dict, Any
 
 PROMPT_DELIMITER = ":-:-:-:"
 
+from src.logger import setup_logging, get_logger
+
+
+logger = get_logger(__name__)
 
 def _log_raw(provider: str, model: str, raw: str) -> None:
-    ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
-    print(f"[LLM_RAW] ts={ts} provider={provider} model={model} chars={len(raw or '')} raw={raw!r}")
-
+    logger.debug(f"[LLM_RAW] provider={provider} model={model} chars={len(raw or '')} raw={raw!r}")
 
 def _split_system_user(content: str) -> Tuple[str, str]:
     """
@@ -81,7 +83,7 @@ class AIProvider(AbstractAIProvider):
         if proxy_url:
             prefix = self._name.lower()
             base_url = f"{proxy_url.rstrip('/')}/{prefix}/"
-            print(f"[lib_llm_ext.AIProvider._create_client] Connecting via proxy: {base_url}")
+            logger.info(f"[lib_llm_ext.AIProvider._create_client]: Connecting via proxy: {base_url}")
             return openai.OpenAI(
                     api_key="proxy",
                     base_url=base_url,
@@ -134,7 +136,7 @@ class AIProvider(AbstractAIProvider):
             resp = self._clean_text(raw)
             return resp
         except Exception as e:
-            print(f"[lib_llm_ext.AIProvider.chat] Exception while communicating with LLM: {e}")
+            logger.exception(f"[lib_llm_ext.AIProvider.chat]: Exception while communicating with LLM: {e}")
             return ""
 
     def _clean_text(self, text: str) -> str:
@@ -150,7 +152,7 @@ class OpenRouterProvider(AIProvider):
         proxy_url = os.environ.get("GATEWAY_URL")
         if proxy_url:
             base_url = f"{proxy_url.rstrip('/')}/openrouter/"
-            print(f"[lib_llm_ext.OpenRouterProvider._create_client] Connecting via proxy: {base_url}")
+            logger.info(f"[lib_llm_ext.OpenRouterProvider._create_client]: Connecting via proxy: {base_url}")
             return openai.OpenAI(
                     api_key="proxy",
                     base_url=base_url,
@@ -238,7 +240,7 @@ class AsiOneProvider(AIProvider):
             resp = self._clean_text(raw)
             return resp
         except Exception as e:
-            print(f"[lib_llm_ext.ASIOneProvider.chat] Exception while communicating with LLM: {e}")
+            logger.exception(f"[lib_llm_ext.ASIOneProvider.chat]: Exception while communicating with LLM: {e}")
             return ""
 
 
@@ -289,7 +291,7 @@ class OpenAIProvider(AIProvider):
             _log_raw(self._name, self._model_name, raw)
             return self._clean_text(raw)
         except Exception as e:
-            print(f"[lib_llm_ext.OpenAIProvider.chat] Exception while communicating with LLM: {e}")
+            logger.exception(f"[lib_llm_ext.OpenAIProvider.chat]: Exception while communicating with LLM: {e}")
             return ""
 
 
@@ -348,8 +350,6 @@ def callProvider(provider_name: str, content: str, max_tokens: int = 6000, reaso
     if not provider or not provider.is_available:
         raise RuntimeError(f"Provider '{provider_name}' not available")
     return provider.chat(content=content, max_tokens=max_tokens, reasoning=reasoning)
-
-
 
 _embedding_model = None
 

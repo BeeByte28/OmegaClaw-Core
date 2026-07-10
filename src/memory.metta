@@ -6,7 +6,7 @@
 (= (embeddingprovider) (empty))
 
 (= (initMemory)
-   (progn (println! "Initializing memory")
+   (progn (log INFO "memory" "Initializing memory")
           (configure maxFeedback 50000)
           (configure maxRecallItems 20)
           (configure maxEpisodeRecallLines 20)
