@@ -15,7 +15,7 @@
 
 ;Connect all the channels:
 (= (initChannels)
-   (progn (println! "Initializing channels")
+   (progn (log INFO "channels" "Initializing channels")
           (configure commchannel irc)
           (if (== (commchannel) irc)
               (progn (configure IRC_channel ##omegaclaw)

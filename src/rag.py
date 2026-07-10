@@ -2,14 +2,12 @@ import os
 import re
 import glob
 import hashlib
-import logging
-import traceback
-
 import chromadb
 import openai
 from   lib_llm_ext import initLocalEmbedding, useLocalEmbedding
+from src.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # --- Constants -----------------------------------------------------------
 
@@ -205,7 +203,7 @@ def init_knowledge(embedding_selection):
     global _embedding_dim, _last_query, _last_result
     _last_query = None
     _last_result = None
-    print(f"Embedding type selected is {embedding_selection}")
+    logger.info(f"Embedding type selected is {embedding_selection}")
 
     try:
         collection = _get_collection()
@@ -227,7 +225,7 @@ def init_knowledge(embedding_selection):
             stored_hash = _get_stored_hash(collection, filename)
 
             if stored_hash == current_hash:
-                print(f"  {filename}: unchanged (skipped)")
+                logger.debug(f"{filename}: unchanged (skipped)")
                 unchanged += 1
                 continue
 
@@ -256,7 +254,7 @@ def init_knowledge(embedding_selection):
                       "Expected 'Local' or 'OpenAI'.")
                  
             if not embeddings:
-                print(f"  {filename}: embedding failed, skipping")
+                logger.warning(f"{filename}: embedding failed, skipping")
                 continue
 
             if _embedding_dim is None:
@@ -283,12 +281,12 @@ def init_knowledge(embedding_selection):
             # Store hash sentinel
             _store_hash(collection, filename, current_hash, _embedding_dim)
 
-            print(f"  {filename}: indexed {len(chunks)} chunks")
+            logger.info(f"{filename}: indexed {len(chunks)} chunks")
             reindexed += 1
 
         total = unchanged + reindexed
         return f"Knowledge: {total} files ({unchanged} unchanged, {reindexed} re-indexed)"
 
     except Exception as e:
-        traceback.print_exc()
+        logger.exception(f"Knowledge init failed: {e}", exc_info=True)
         return f"Knowledge init failed: {e}"
