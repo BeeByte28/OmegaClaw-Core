@@ -72,7 +72,3 @@
                                    (if (== (commchannel) mattermost)
                                        (let $temp (cut) (py-call (mattermost.send_message $safemsg)))
                                        (let $temp (cut) (py-call (mock.send_message $safemsg)))))))))) _))
-
-;Search the internet for some information:
-(= (search $msg)
-   (py-call (websearch.search $msg)))

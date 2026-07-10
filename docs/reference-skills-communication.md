@@ -60,15 +60,15 @@ The agent does not normally call `receive` itself; the loop wraps it:
 
 ---
 
-## `search`
+## `websearch`
 
 ### Signature
 ```metta
-(search "query")
+(websearch "query")
 ```
 
 ### Purpose
-Perform a web search through the `channels/websearch.py` adapter.
+Perform a web search through the `src/websearch.py` adapter.
 
 ### Parameters
 - `query` — the search string.
@@ -78,7 +78,7 @@ A string of search results suitable for feeding back into the prompt.
 
 ### Examples
 ```metta
-(search "MeTTa AtomSpace tutorial")
+(websearch "MeTTa AtomSpace tutorial")
 ```
 
 ### Notes / Limits
