@@ -7,6 +7,7 @@
 (= (reasoningMode) (empty))
 (= (wakeupInterval) (empty))
 (= (logConfigPath) (empty))
+(= (memoryDirectory) (empty))
 (= (spamShield) (empty)) ; TODO: this parameter is considered deprecated
 
 (= (initLoop)
@@ -20,6 +21,7 @@
           (configure reasoningMode medium)
           (configure wakeupInterval 600) ;600=10 minutes
           (configure logConfigPath "")
+          (configure memoryDirectory ./)
           (change-state! &prevmsg "")
           (change-state! &lastresults "")
           (change-state! &loops (maxNewInputLoops))
@@ -40,11 +42,14 @@
                          " toolName3 arg3" (newline)
                          " toolName4 arg4" (newline)
                          " toolName5 arg5" (newline)
-                         " LAST_SKILL_USE_RESULTS: " (last_chars (get-state &lastresults) (maxFeedback)) " HISTORY: " (getHistory) " TIME: " (get_time_as_string)))))
+                         " SAVE_PERMANENT_FILES_DIR: " (memoryDirectory)
+                         " LAST_SKILL_USE_RESULTS: you must rectify ALERT_FAILED skill use cases " (last_chars (get-state &lastresults) (maxFeedback)) 
+                         " HISTORY: " (getHistory) 
+                         " TIME: " (get_time_as_string)))))
 
 (= (HandleError $msg $cmd $sexpr)
    (case $sexpr (((Error $a $b) (let $new (append (get-state &error) (($msg $cmd)))
-                                          (change-state! &error $new)))
+                                          (progn (change-state! &error $new) (ALERT_FAILED $a $b))))
                  ($else $sexpr))))
 
 (= (omegaclaw)
