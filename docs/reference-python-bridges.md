@@ -4,11 +4,11 @@ MeTTa handles reasoning and control flow; bridges handle everything that needs a
 
 ## `src/logger.py`
 
-Centralised logging setup. Called once at startup from `lib_llm_ext.py`; all other Python modules obtain a logger through `get_logger` rather than calling `logging.getLogger` directly.
+Centralized logging setup. Called once at startup from `loop.metta`; all Python modules obtain a logger through `get_logger` rather than calling `logging.getLogger` directly.
 
 | Function | Purpose |
 |---|---|
-| `setup_logging()` | Configures the root logger with a stdout handler and a `TimedRotatingFileHandler` that rotates at midnight and keeps 7 days of backups. Idempotent — safe to import from multiple modules. Falls back to stdout-only if the log directory is not writable. |
+| `setup_logging()` | Configures the root logger using the configuration script passed as a parameter. Idempotent — safe to import from multiple modules. Falls back to stdout-only if the configuration script is not found. |
 | `get_logger(name)` | Returns `logging.getLogger(name)`. Use this instead of calling `logging.getLogger` directly so the relationship to the shared setup is explicit. |
 | `log_debug(msg, module)` | MeTTa bridge — write a DEBUG entry under logger `module`. |
 | `log_info(msg, module)` | MeTTa bridge — write an INFO entry under logger `module`. |
