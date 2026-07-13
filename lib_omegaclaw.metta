@@ -15,6 +15,7 @@
 !(import! &self (library OmegaClaw-Core ./channels/mattermost.py))
 !(import! &self (library OmegaClaw-Core ./channels/telegram.py))
 !(import! &self (library OmegaClaw-Core ./channels/slack.py))
+!(import! &self (library OmegaClaw-Core ./channels/robot.py))
 !(import! &self (library OmegaClaw-Core ./src/channels))
 !(import! &self (library OmegaClaw-Core ./src/skills))
 !(import! &self (library OmegaClaw-Core ./src/websearch.py))

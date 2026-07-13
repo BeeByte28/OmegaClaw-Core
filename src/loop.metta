@@ -35,7 +35,9 @@
                (log INFO "loop" (py-call (rag.init_knowledge "Local"))))))
 
 (= (getContext)
-   (string-safe (py-str ("PROMPT: " (getPrompt (provider)) " SKILLS: " (getSkills)
+   (string-safe (py-str ("PROMPT: " (getPrompt (provider))
+                         (newline) "ROBOT BODY CONTEXT (authoritative; how to speak and act as this robot, incl. inline |@action| commands): " (py-call (robot.get_system))
+                         " SKILLS: " (getSkills)
                          " OUTPUT_FORMAT: Up to 5 lines, do not wrap quotes around args, do not use variables:" (newline)
                          " toolName1 arg1" (newline)
                          " toolName2 arg2" (newline)
