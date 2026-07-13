@@ -10,7 +10,7 @@ module.exports = {
   dependencyDashboardAutoclose: true,
   prCreation: "approval",
   prConcurrentLimit: 0,
-  reviewers: "anseliv",
+  reviewers: ["anseliv", "vsbogd"],
   packageRules: [
     {
       description: "lockFileMaintenance",
@@ -22,7 +22,7 @@ module.exports = {
         "major",
         "lockFileMaintenance",
       ],
-      minimumReleaseAge: 3,
+      minimumReleaseAge: "3",
     },
   ],
 };
