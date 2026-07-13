@@ -3,6 +3,7 @@ module.exports = {
   username: "renovate-asi",
   gitAuthor: "Renovate Bot <bot@renovateapp.com>",
   onboarding: false,
+  requireConfig: false,
   platform: "github",
   forkProcessing: "disable",
   repositories: ["asi-alliance/OmegaClaw-Core"],
