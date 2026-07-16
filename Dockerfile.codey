@@ -1,0 +1,6 @@
+FROM singularitynet/omegaclaw:latest
+ARG OC=/PeTTa/repos/OmegaClaw-Core
+COPY --chmod=0644 channels/robot.py   ${OC}/channels/robot.py
+COPY --chmod=0644 lib_omegaclaw.metta ${OC}/lib_omegaclaw.metta
+COPY --chmod=0644 src/channels.metta  ${OC}/src/channels.metta
+COPY --chmod=0644 src/loop.metta      ${OC}/src/loop.metta
