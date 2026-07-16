@@ -132,12 +132,31 @@ def _merge_send_continuations(lines):
     return merged
 
 
+def _coerce_speech_lines(lines):
+    """A line whose leading token is not a known command is speech the LLM
+    forgot to wrap in `send`; wrap it so it still reaches the user instead of
+    evaluating to a silent no-op. Run AFTER _merge_send_continuations so genuine
+    multi-line sends are already coalesced. Paren-only lines (no command name)
+    and the pin shorthand ('-...') are left for the main loop to handle."""
+    coerced = []
+    for line in lines:
+        stripped = line.strip()
+        name = _get_command_name(line)
+        if (not name or name in LLM_COMMANDS
+                or stripped.startswith("-") or stripped.startswith("(-")):
+            coerced.append(line)
+        else:
+            coerced.append("send " + stripped)
+    return coerced
+
+
 def balance_parentheses(s):
     s = s.replace("_quote_", '"').replace("_newline_", "\n")
     sexprs = []
     special_two_arg_cmds = {"write-file", "append-file"}
     lines = [line.strip() for line in s.splitlines() if line.strip()]
     lines = _merge_send_continuations(lines)
+    lines = _coerce_speech_lines(lines)
     for line in lines:
         if line.startswith("(-"):
             line = "(pin -" + line[2:]
@@ -229,6 +248,13 @@ def test_balance_parenthesis():
     assert balance_parentheses('') == '()'
     assert balance_parentheses('   ') == '()'
     assert balance_parentheses('()\nsend hello') == '((send "hello"))'
+    # bare speech the LLM forgot to wrap in `send` must still reach the user
+    assert balance_parentheses('Huh-heh-heh! |smile,1.5,0.7| |yes_once|') == '((send "Huh-heh-heh! |smile,1.5,0.7| |yes_once|"))'
+    assert balance_parentheses('Already got that one\nremember foo') == '((send "Already got that one") (remember "foo"))'
+    assert balance_parentheses('Coming over now |@come_to_me|') == '((send "Coming over now |@come_to_me|"))'
+    # real commands and pin shorthand are untouched by the coercion
+    assert balance_parentheses('send hi\nremember x\npin y') == '((send "hi") (remember "x") (pin "y"))'
+    assert balance_parentheses('- note this') == '((pin "- note this"))'
 
 
 if __name__ == "__main__":
