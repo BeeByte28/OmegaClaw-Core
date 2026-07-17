@@ -4,6 +4,9 @@ import re
 from datetime import datetime
 
 TS_RE = re.compile(r'^\("(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})"')
+# Must stay in sync with the skills advertised in src/skills.metta (getSkills):
+# an advertised command missing here is treated as speech and wrapped in `send`
+# (see _coerce_speech_lines) or swallowed into a preceding send, instead of run.
 LLM_COMMANDS = {
     "append-file",
     "episodes",
@@ -13,11 +16,11 @@ LLM_COMMANDS = {
     "query",
     "read-file",
     "remember",
-    "search",
     "send",
     "shell",
     "tavily-search",
     "technical-analysis",
+    "websearch",
     "write-file",
 }
 
@@ -256,6 +259,9 @@ def test_balance_parenthesis():
     # real commands and pin shorthand are untouched by the coercion
     assert balance_parentheses('send hi\nremember x\npin y') == '((send "hi") (remember "x") (pin "y"))'
     assert balance_parentheses('- note this') == '((pin "- note this"))'
+    # every advertised skill must be recognized, not coerced to send
+    assert balance_parentheses('websearch weather in tokyo') == '((websearch "weather in tokyo"))'
+    assert balance_parentheses('send checking\nwebsearch tokyo') == '((send "checking") (websearch "tokyo"))'
 
 
 if __name__ == "__main__":
