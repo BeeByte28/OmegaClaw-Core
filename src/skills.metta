@@ -11,6 +11,9 @@
     "- Append line to file: append-file filename string",
     ;COMMUNICATION CHANNELS:
     "- Send message to user: send string"
+    "- Speak to the user unprompted, when they did not just say anything, e.g. a reminder you promised is now due: notify string"
+    "  send is only delivered while the user is waiting on your reply; anything you want them to hear at any other time must use notify."
+    "  Never notify to narrate your own state or think aloud (e.g. 'no new input, standing by') -- that is said out loud in the room. Use pin for that."
     "- Search the web: websearch string"
     "- Search the web using the Tavily Search Agent: tavily-search string"
     "- Get technical analysis for a stock ticker using the Technical Analysis Agent: technical-analysis ticker"

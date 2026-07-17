@@ -62,6 +62,18 @@
                            (py-call (mock.getLastMessage)))))))))
 
 ;Send a message to all communication channels:
+;Proactive speech. On the robot channel a plain send is only spoken while the
+;person's turn is open, because the agent also sends narration on idle wake
+;cycles; notify marks a message the person should hear unprompted. Channels with
+;no turn concept just send it.
+(= (notify $msg)
+   (if (== (commchannel) robot)
+       (if (!= $msg (get-state &lastsend))
+           (progn (change-state! &lastsend $msg)
+                  (let $safemsg (string-replace $msg "\n" "\\n")
+                       (let $temp (cut) (py-call (robot.notify_message $safemsg))))) _)
+       (send $msg)))
+
 !(change-state! &lastsend "")
 (= (send $msg)
    (if (!= $msg (get-state &lastsend))

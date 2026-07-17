@@ -8,6 +8,7 @@ LLM_COMMANDS = {
     "append-file",
     "episodes",
     "metta",
+    "notify",
     "pin",
     "query",
     "read-file",
