@@ -4,6 +4,16 @@ from typing import Optional, Tuple, Dict, Any
 
 PROMPT_DELIMITER = ":-:-:-:"
 
+# The MeTTa loop is single-threaded and calls the LLM inline, so a hung request
+# freezes the whole agent: it stops ticking, receiving and sending. The SDK
+# defaults (timeout=600s, max_retries=2) let one call block for ~30 minutes --
+# a 45-minute freeze was observed in the 2026-07-16 robot logs. Fail fast
+# instead; the loop retries on its next tick, and a robot voice pipeline gives
+# up on a turn long before this anyway. Retries are left to the loop, since an
+# SDK retry just extends the freeze.
+LLM_TIMEOUT_SEC = 45.0
+LLM_MAX_RETRIES = 0
+
 from src.logger import setup_logging, get_logger
 
 
@@ -87,6 +97,8 @@ class AIProvider(AbstractAIProvider):
             return openai.OpenAI(
                     api_key="proxy",
                     base_url=base_url,
+                    timeout=LLM_TIMEOUT_SEC,
+                    max_retries=LLM_MAX_RETRIES,
                     )
         if self._var_name in os.environ:
             if self._var_name == "OLLAMA_API_KEY":
@@ -96,7 +108,12 @@ class AIProvider(AbstractAIProvider):
                 elif not self._base_url.endswith("/v1"):
                     self._base_url = self._base_url.rstrip("/") + "/v1"
 
-            return openai.OpenAI(api_key=os.environ.get(self._var_name), base_url=self._base_url)
+            return openai.OpenAI(
+                api_key=os.environ.get(self._var_name),
+                base_url=self._base_url,
+                timeout=LLM_TIMEOUT_SEC,
+                max_retries=LLM_MAX_RETRIES,
+            )
 
         return None
 
@@ -156,9 +173,16 @@ class OpenRouterProvider(AIProvider):
             return openai.OpenAI(
                     api_key="proxy",
                     base_url=base_url,
+                    timeout=LLM_TIMEOUT_SEC,
+                    max_retries=LLM_MAX_RETRIES,
                     )
         if self._var_name in os.environ:
-            return openai.OpenAI(api_key=os.environ.get(self._var_name), base_url=self._base_url)
+            return openai.OpenAI(
+                api_key=os.environ.get(self._var_name),
+                base_url=self._base_url,
+                timeout=LLM_TIMEOUT_SEC,
+                max_retries=LLM_MAX_RETRIES,
+            )
 
         return None
     
