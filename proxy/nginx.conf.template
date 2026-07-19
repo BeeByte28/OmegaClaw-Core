@@ -21,6 +21,14 @@ http {
     proxy_send_timeout    120s;
     proxy_read_timeout    120s;
 
+    # Resolve upstreams at runtime with IPv6 off. Without this nginx caches the
+    # startup getaddrinfo result, which includes the AAAA records of providers
+    # behind Cloudflare; on a host with no IPv6 route those addresses fail with
+    # "Network is unreachable" and nginx keeps round-robining onto them.
+    # Only applies to upstreams named via a variable (see /openrouter/).
+    resolver ${DNS_RESOLVER} ipv6=off valid=60s;
+    resolver_timeout 5s;
+
     server {
         listen 8080;
 
@@ -75,8 +83,13 @@ http {
             proxy_http_version 1.1;
         }
 
+        # Upstream named via $openrouter_host so the ipv6=off resolver above is
+        # used; the rewrite reproduces what the trailing /api/v1/ on a static
+        # proxy_pass did (a variable proxy_pass does no prefix substitution).
         location /openrouter/ {
-            proxy_pass https://openrouter.ai/api/v1/;
+            set $openrouter_host openrouter.ai;
+            rewrite ^/openrouter/(.*)$ /api/v1/$1 break;
+            proxy_pass https://$openrouter_host;
             proxy_set_header Authorization "Bearer ${OPENROUTER_API_KEY}";
             proxy_set_header Host openrouter.ai;
             proxy_set_header Content-Type $content_type;
