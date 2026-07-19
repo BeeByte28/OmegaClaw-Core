@@ -33,6 +33,7 @@ channels: required only when the deployment has a secret configured.
 """
 
 import json
+import re
 import socket
 import threading
 import time
@@ -68,6 +69,14 @@ _UNIT_WORDS = ("s", "sec", "secs", "second", "seconds",
                "m", "min", "mins", "minute", "minutes",
                "h", "hr", "hrs", "hour", "hours",
                "d", "day", "days")
+
+
+def _dedupe_key(text):
+    """Loose key for spotting a re-issued reminder: ignores case, spacing and
+    trailing punctuation. Deliberately not fuzzy -- two genuinely different
+    reminders set seconds apart ("check the oven" / "take it out") must both
+    survive, so only near-identical text is treated as a repeat."""
+    return " ".join(str(text).lower().split()).strip(" .!?,")
 
 
 def _parse_delay(token):
@@ -118,6 +127,13 @@ def remind(spec):
         return ("REMIND-FAILED-AMBIGUOUS-DELAY: write the delay as one token, "
                 f"e.g. remind {parts[0]}{first_word[0]} <what to say>")
     with _reminders_lock:
+        # Idle cycles make the agent re-issue commands it already ran, and a
+        # repeated reminder is worse than a repeated pin: the robot says the
+        # same thing to the person twice. Only pending ones are compared, so
+        # the same reminder can be set again once it has fired.
+        key = _dedupe_key(text)
+        if any(_dedupe_key(pending) == key for _, pending in _reminders):
+            return "REMIND-ALREADY-SCHEDULED: an identical reminder is still pending, do not set it again"
         _reminders.append((time.time() + seconds, text))
     return "REMIND-SCHEDULED"
 
@@ -140,6 +156,10 @@ def getLastMessage():
     for text in _due_reminders():
         entry = f"REMINDER DUE: {text}"
         tmp = f"{tmp} | {entry}" if tmp else entry
+    # Only when something is actually delivered: the loop polls this every tick,
+    # so logging unconditionally would emit a line per second forever.
+    if tmp:
+        print(f"[ROBOT] getLastMessage: {tmp}", flush=True)
     return tmp
 
 
@@ -163,13 +183,41 @@ def _send_json(sock, obj):
         return False
 
 
+_INLINE_TAG_RE = re.compile(r"\|[^|]*\|")
+# Every <...> tag, not just a lone one: the agent emits "<response>" but also
+# "<reply></reply>", which a single-tag pattern misses.
+_MARKUP_RE = re.compile(r"<[^>]*>")
+
+
+def _is_speakable(text):
+    """False for scaffolding that must never reach the robot's voice.
+
+    The agent sometimes emits raw generation artefacts as a say -- "_", or a
+    lone "<response>" tag -- and anything sent here is read out loud in the
+    room. A say carrying only inline |tags| is legitimate: that is a gesture
+    with no speech.
+    """
+    without_tags = _INLINE_TAG_RE.sub("", text).strip()
+    if not without_tags:
+        return bool(_INLINE_TAG_RE.search(text))
+    # Only used to decide; the original text is what gets sent.
+    without_markup = _MARKUP_RE.sub("", without_tags).strip()
+    if not without_markup:
+        return False
+    return any(ch.isalnum() for ch in without_markup)
+
+
 def _say(text):
+    text = str(text)
+    if not _is_speakable(text):
+        print(f"[ROBOT] Not speakable, dropped: {text[:60]!r}", flush=True)
+        return "SEND-SKIPPED-NOT-SPEAKABLE: that was not words to say out loud"
     with _client_lock:
         sock = _client_sock
     if sock is None:
         print("[ROBOT] No robot connected; dropping say")
         return "NO-ROBOT-CONNECTED"
-    msg = {"type": "say", "text": str(text)}
+    msg = {"type": "say", "text": text}
     if _send_json(sock, msg):
         return "SEND-SUCCESS"
     print("[ROBOT] Send failed; robot likely disconnected")
