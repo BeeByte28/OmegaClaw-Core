@@ -4,22 +4,20 @@ OmegaClaw acts as the server; a robot's voice pipeline connects as a TCP
 client and exchanges newline-delimited JSON messages:
 
   robot -> agent:  {"type": "hello", "robot": "<name>", "auth": "<secret>"}
-                   {"type": "utterance", "turn": 1, "text": "...", "speaker": "user",
-                    "system": "<per-turn system prompt: persona + animation +
+                   {"type": "utterance", "text": "...", "speaker": "user",
+                    "system": "<system prompt: persona + animation +
                                 inline-skill grammar + live places + nav mode>"}
-                   {"type": "cancel", "turn": 1}
+                   {"type": "cancel"}
                    {"type": "ping"}
   agent -> robot:  {"type": "hello_ack", "ok": true, "auth": "ok"|"off"}
-                   {"type": "say", "turn": 1, "text": "..."}
+                   {"type": "say", "text": "..."}
                    {"type": "pong"}
 
-Every ``say`` is delivered: to the person's open turn if there is one, otherwise
-spoken/acted on as unprompted speech. ``turn`` is echoed back for correlation
-and ``cancel`` only -- the adapter does not match on it, because the agent
-stamps the last turn it received and never clears it, so gating on the id
-silently swallowed anything emitted on the agent's own loop (a gesture, a
-``|@skill|`` tag). Keeping the robot quiet on idle cycles is therefore a prompt
-concern, not a transport one.
+There are no turn ids. The agent is a continuous loop that speaks and acts on
+its own schedule, so every ``say`` is delivered on arrival: into the person's
+open reply stream if there is one, otherwise spoken/acted on as unprompted
+speech. Keeping the robot quiet on idle cycles is a prompt concern, not a
+transport one.
 
 Robot ACTIONS (navigate, come here, move) are NOT a separate command channel:
 the ``system`` prompt the robot forwards each turn carries the inline-skill
@@ -46,8 +44,6 @@ _client_sock = None
 _client_lock = threading.Lock()
 _last_message = ""
 _msg_lock = threading.Lock()
-_current_turn = None
-_turn_lock = threading.Lock()
 _last_system = ""
 _system_lock = threading.Lock()
 
@@ -90,14 +86,12 @@ def _send_json(sock, obj):
 
 
 def _say(text):
-    with _turn_lock:
-        turn = _current_turn
     with _client_lock:
         sock = _client_sock
     if sock is None:
         print("[ROBOT] No robot connected; dropping say")
         return "NO-ROBOT-CONNECTED"
-    msg = {"type": "say", "turn": turn, "text": str(text)}
+    msg = {"type": "say", "text": str(text)}
     if _send_json(sock, msg):
         return "SEND-SUCCESS"
     print("[ROBOT] Send failed; robot likely disconnected")
@@ -105,7 +99,7 @@ def _say(text):
 
 
 def send_message(text):
-    """Say something to the person; delivered whether or not their turn is open."""
+    """Say something to the person; delivered whether or not they are waiting."""
     return _say(text)
 
 
@@ -140,7 +134,6 @@ def _handshake(sock, addr):
 
 
 def _client_loop(sock, addr, robot_name):
-    global _current_turn
     sock.settimeout(60)
     buf = b""
     while _running:
@@ -172,14 +165,11 @@ def _client_loop(sock, addr, robot_name):
                     with _system_lock:
                         _last_system = str(system)
                 if text:
-                    with _turn_lock:
-                        _current_turn = msg.get("turn")
                     _set_last(f"{speaker}: {text}")
             elif mtype == "cancel":
-                # The robot stopped listening for this turn (barge-in). The
-                # agent's reply may already be in flight; the adapter drops
-                # stale says by turn id, so just log it here.
-                print(f"[ROBOT] Turn {msg.get('turn')} cancelled by robot")
+                # The person stopped listening (barge-in). A reply may
+                # already be in flight; nothing to reconcile, so just log it.
+                print("[ROBOT] Reply cancelled by robot")
             elif mtype == "ping":
                 _send_json(sock, {"type": "pong"})
     print(f"[ROBOT] {robot_name}@{addr} disconnected")
