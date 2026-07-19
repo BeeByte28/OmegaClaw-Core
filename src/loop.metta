@@ -56,43 +56,71 @@
 
 (= (omegaclaw)
    (omegaclaw 1))
+
+; The whole agent: one tail-recursive tick, ~once per sleepInterval, forever.
+; $k is the iteration number. Line at the very bottom recurses into the next tick.
 (= (omegaclaw $k)
-   (progn (if (== $k 1) (progn (initLoop)
-                               (applySecurityPolicy)
-                               (initMemory)
-                               (initKnowledge)
-                               (initChannels))
-                        (change-state! &loops (- (get-state &loops) 1)))
-          (let $prompt (getContext)
-               (progn (log INFO "loop" (---------iteration $k))
-                      (let* (($msgrcv (string-safe (repr (receive))))
-                             ($msgnew (prog1 (and (> (string_length $msgrcv) 0) (!= $msgrcv (get-state &prevmsg)))
-                                             (if (> (string_length $msgrcv) 0) (change-state! &prevmsg $msgrcv) _)))
-                             ($msg (get-state &prevmsg))
-                             ($_ (if (and (> $k 1) $msgnew)
-                                     (change-state! &loops (maxNewInputLoops)) _)))
-                            (if (> (get-state &loops) 0)
-                                (let* (($lastmessage (if $msgnew (HUMAN-MSG: $msg) (if (spamShield) " DO NOT RE-SEND OR SPAM!" "")))
-                                       ($_ (change-state! &nextWakeAt (+ (get_time) (wakeupInterval))))
-                                       ($_ (log INFO "loop" $lastmessage))
-                                       ($send (py-str ($prompt :-:-:-: $lastmessage)))
-                                       ($_ (log INFO "loop" (CHARS_SENT: (string_length $send) $send)))
-                                       ($respi (py-call (lib_llm_ext.callProvider (provider) $send (maxOutputToken) (reasoningMode))))
-                                       ($resp (py-call (helper.balance_parentheses $respi)))
-                                       ($response (if (== "(" (first_char $resp)) $resp (progn (log INFO "loop" $resp) (repr (REMEMBER:OUTPUT_NOTHING_ELSE_THAN: ((skill arg) ...))))))
-                                       ($sexpr (catch (sread $response)))
-                                       ($_ (change-state! &error ()))
-                                       ($mcerr (HandleError MULTI_COMMAND_FAILURE_NOTHING_WAS_DONE_PLEASE_CORRECT_PARENTHESES_AND_USE_QUOTES_AND_RETRY $response $sexpr))
-                                       ($_ (log INFO "loop" (RESPONSE: $sexpr)))
-                                       ($results (if (== $mcerr $sexpr)
-                                                      (RESULTS: (collapse (let $s (superpose $sexpr) (COMMAND_RETURN: ($s (HandleError SINGLE_COMMAND_ERROR_NOTHING_WAS_DONE_PLEASE_FIX_AND_RETRY $s (catch (let $R (eval $s) (py-call (helper.normalize_string $R))))))))))
-                                                      (RESULTS: $mcerr)))
-                                       ($_ (log INFO "loop" (RESPONSE: $results))))
-                                      (progn (if (or $msgnew  (not (== $sexpr ()))) (addToHistory $msg $response $sexpr $msgnew) _)
-                                             (change-state! &lastresults (string-safe (repr $results)))))
-                                (if (> (get_time) (get-state &nextWakeAt))
-                                    (change-state! &loops (+ 1 (maxWakeLoops))) _)))
-                      (sleep (sleepInterval))
-                      (cut)
-                      (gc)
-                      (omegaclaw (+ 1 $k))))))
+   (progn
+     ; First tick only: boot. Every later tick: spend one unit of thinking budget.
+     (if (== $k 1)
+         (progn (initLoop)
+                (applySecurityPolicy)
+                (initMemory)
+                (initKnowledge)
+                (initChannels))
+         (change-state! &loops (- (get-state &loops) 1)))
+
+     ; Rebuild the full prompt from scratch this tick (persona + robot body +
+     ; skills + history + last results + time).
+     (let $prompt (getContext)
+       (progn
+         (log INFO "loop" (---------iteration $k))
+
+         ; Poll the channel and decide whether a NEW message arrived. A new
+         ; message refills the thinking budget (&loops) back to maxNewInputLoops.
+         (let* (($msgrcv (string-safe (repr (receive))))
+                ($msgnew (prog1 (and (> (string_length $msgrcv) 0) (!= $msgrcv (get-state &prevmsg)))
+                                (if (> (string_length $msgrcv) 0) (change-state! &prevmsg $msgrcv) _)))
+                ($msg (get-state &prevmsg))
+                ($_ (if (and (> $k 1) $msgnew)
+                        (change-state! &loops (maxNewInputLoops)) _)))
+
+           (if (> (get-state &loops) 0)
+
+               ; ===== budget remains: THINK this tick (this branch calls the LLM) =====
+               (let* (($lastmessage (if $msgnew (HUMAN-MSG: $msg) (if (spamShield) " DO NOT RE-SEND OR SPAM!" "")))
+                      ($_ (change-state! &nextWakeAt (+ (get_time) (wakeupInterval))))
+                      ($_ (log INFO "loop" $lastmessage))
+                      ($send (py-str ($prompt :-:-:-: $lastmessage)))
+                      ($_ (log INFO "loop" (CHARS_SENT: (string_length $send) $send)))
+                      ; 1. call the LLM  2. parse its text into command s-exprs
+                      ($respi (py-call (lib_llm_ext.callProvider (provider) $send (maxOutputToken) (reasoningMode))))
+                      ($resp (py-call (helper.balance_parentheses $respi)))
+                      ($response (if (== "(" (first_char $resp))
+                                     $resp
+                                     (progn (log INFO "loop" $resp)
+                                            (repr (REMEMBER:OUTPUT_NOTHING_ELSE_THAN: ((skill arg) ...))))))
+                      ($sexpr (catch (sread $response)))
+                      ($_ (change-state! &error ()))
+                      ($mcerr (HandleError MULTI_COMMAND_FAILURE_NOTHING_WAS_DONE_PLEASE_CORRECT_PARENTHESES_AND_USE_QUOTES_AND_RETRY $response $sexpr))
+                      ($_ (log INFO "loop" (RESPONSE: $sexpr)))
+                      ; 3. run EACH command (superpose splits, collapse regathers),
+                      ;    wrapping each as (COMMAND_RETURN: (command result)).
+                      ($results (if (== $mcerr $sexpr)
+                                    (RESULTS: (collapse (let $s (superpose $sexpr)
+                                                          (COMMAND_RETURN: ($s (HandleError SINGLE_COMMAND_ERROR_NOTHING_WAS_DONE_PLEASE_FIX_AND_RETRY $s (catch (let $R (eval $s) (py-call (helper.normalize_string $R))))))))))
+                                    (RESULTS: $mcerr)))
+                      ($_ (log INFO "loop" (RESPONSE: $results))))
+                 ; persist to history, and keep results for next tick's prompt
+                 (progn (if (or $msgnew  (not (== $sexpr ()))) (addToHistory $msg $response $sexpr $msgnew) _)
+                        (change-state! &lastresults (string-safe (repr $results)))))
+
+               ; ===== no budget: IDLE. Self-wake once wakeupInterval has passed. =====
+               (if (> (get_time) (get-state &nextWakeAt))
+                   (change-state! &loops (+ 1 (maxWakeLoops))) _)))
+
+         ; End of tick: sleep, cut choice points, gc, recurse into the next tick.
+         (sleep (sleepInterval))
+         (cut)
+         (gc)
+         (omegaclaw (+ 1 $k))))))
