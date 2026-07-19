@@ -15,6 +15,7 @@ LLM_COMMANDS = {
     "query",
     "read-file",
     "remember",
+    "remind",
     "send",
     "shell",
     "tavily-search",

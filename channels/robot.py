@@ -35,6 +35,7 @@ channels: required only when the deployment has a secret configured.
 import json
 import socket
 import threading
+import time
 
 import auth
 
@@ -46,6 +47,8 @@ _last_message = ""
 _msg_lock = threading.Lock()
 _last_system = ""
 _system_lock = threading.Lock()
+_reminders = []          # (due_epoch_seconds, text), earliest not necessarily first
+_reminders_lock = threading.Lock()
 
 
 def _set_last(msg):
@@ -57,12 +60,49 @@ def _set_last(msg):
             _last_message = _last_message + " | " + msg
 
 
+def remind(spec):
+    """Schedule a reminder from "<seconds> <text>", delivered as input when due.
+
+    Timing cannot live in the agent's reasoning: the loop only calls the LLM
+    while it has budget, so between turns it is idle for wakeupInterval and a
+    short deadline would silently pass unnoticed. Here a real clock owns the
+    deadline and the due text is surfaced by getLastMessage, which the loop
+    polls every tick -- that counts as new input, which refills the budget, so
+    the agent is thinking again at the moment the reminder comes due.
+    """
+    parts = str(spec).strip().split(None, 1)
+    if len(parts) < 2:
+        return "REMIND-FAILED-EXPECTED: remind <seconds> <what to say>"
+    try:
+        seconds = float(parts[0])
+    except ValueError:
+        return "REMIND-FAILED-FIRST-ARG-MUST-BE-SECONDS"
+    if seconds < 0:
+        return "REMIND-FAILED-SECONDS-MUST-NOT-BE-NEGATIVE"
+    with _reminders_lock:
+        _reminders.append((time.time() + seconds, parts[1]))
+    return "REMIND-SCHEDULED"
+
+
+def _due_reminders():
+    """Pop every reminder whose deadline has passed."""
+    now = time.time()
+    with _reminders_lock:
+        due = [text for due_at, text in _reminders if due_at <= now]
+        _reminders[:] = [(d, t) for d, t in _reminders if d > now]
+    return due
+
+
 def getLastMessage():
     global _last_message
     with _msg_lock:
         tmp = _last_message
         _last_message = ""
-        return tmp
+    # Due reminders enter as input so the loop treats them as new and wakes.
+    for text in _due_reminders():
+        entry = f"REMINDER DUE: {text}"
+        tmp = f"{tmp} | {entry}" if tmp else entry
+    return tmp
 
 
 def get_system():
