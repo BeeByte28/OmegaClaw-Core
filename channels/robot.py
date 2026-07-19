@@ -60,8 +60,39 @@ def _set_last(msg):
             _last_message = _last_message + " | " + msg
 
 
+_UNIT_SECONDS = {"s": 1, "m": 60, "h": 3600, "d": 86400}
+# Unit words that must never be swallowed as message text: "remind 1 hour call
+# mum" would otherwise parse as 1 second saying "hour call mum" -- a reminder
+# that looks scheduled, fires almost immediately, and says something garbled.
+_UNIT_WORDS = ("s", "sec", "secs", "second", "seconds",
+               "m", "min", "mins", "minute", "minutes",
+               "h", "hr", "hrs", "hour", "hours",
+               "d", "day", "days")
+
+
+def _parse_delay(token):
+    """Seconds from "90" or "30s"/"5m"/"1h"/"2d". None if it is not a delay."""
+    token = token.strip().lower()
+    if not token:
+        return None
+    try:
+        return float(token)          # bare number == seconds
+    except ValueError:
+        pass
+    value, unit = token[:-1], token[-1:]
+    if unit not in _UNIT_SECONDS:
+        return None
+    try:
+        return float(value) * _UNIT_SECONDS[unit]
+    except ValueError:
+        return None
+
+
 def remind(spec):
-    """Schedule a reminder from "<seconds> <text>", delivered as input when due.
+    """Schedule a reminder from "<delay> <text>", delivered as input when due.
+
+    Delay is one token: seconds ("90") or a unit suffix ("30s", "5m", "1h",
+    "2d"). It must not be split across tokens -- see _UNIT_WORDS.
 
     Timing cannot live in the agent's reasoning: the loop only calls the LLM
     while it has budget, so between turns it is idle for wakeupInterval and a
@@ -72,15 +103,22 @@ def remind(spec):
     """
     parts = str(spec).strip().split(None, 1)
     if len(parts) < 2:
-        return "REMIND-FAILED-EXPECTED: remind <seconds> <what to say>"
-    try:
-        seconds = float(parts[0])
-    except ValueError:
-        return "REMIND-FAILED-FIRST-ARG-MUST-BE-SECONDS"
+        return "REMIND-FAILED-EXPECTED: remind <delay> <what to say>, e.g. remind 5m call mum"
+    seconds = _parse_delay(parts[0])
+    if seconds is None:
+        return ("REMIND-FAILED-BAD-DELAY: first token must be seconds or "
+                "<number><s|m|h|d>, e.g. 90 or 5m or 1h")
     if seconds < 0:
-        return "REMIND-FAILED-SECONDS-MUST-NOT-BE-NEGATIVE"
+        return "REMIND-FAILED-DELAY-MUST-NOT-BE-NEGATIVE"
+    text = parts[1].strip()
+    # Reject a unit written as its own word, rather than reading it as message
+    # text and scheduling a wildly wrong deadline.
+    first_word = text.split(None, 1)[0].lower().rstrip(".,") if text else ""
+    if first_word in _UNIT_WORDS:
+        return ("REMIND-FAILED-AMBIGUOUS-DELAY: write the delay as one token, "
+                f"e.g. remind {parts[0]}{first_word[0]} <what to say>")
     with _reminders_lock:
-        _reminders.append((time.time() + seconds, parts[1]))
+        _reminders.append((time.time() + seconds, text))
     return "REMIND-SCHEDULED"
 
 
