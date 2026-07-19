@@ -11,13 +11,15 @@ client and exchanges newline-delimited JSON messages:
                    {"type": "ping"}
   agent -> robot:  {"type": "hello_ack", "ok": true, "auth": "ok"|"off"}
                    {"type": "say", "turn": 1, "text": "..."}
-                   {"type": "say", "turn": 1, "text": "...", "proactive": true}
                    {"type": "pong"}
 
-A plain ``say`` is a reply and is only spoken while that turn is still open. A
-``say`` with ``proactive`` set is the agent deliberately addressing the person
-unprompted (a due reminder) and is spoken even with no turn open -- see
-``notify_message``.
+Every ``say`` is delivered: to the person's open turn if there is one, otherwise
+spoken/acted on as unprompted speech. ``turn`` is echoed back for correlation
+and ``cancel`` only -- the adapter does not match on it, because the agent
+stamps the last turn it received and never clears it, so gating on the id
+silently swallowed anything emitted on the agent's own loop (a gesture, a
+``|@skill|`` tag). Keeping the robot quiet on idle cycles is therefore a prompt
+concern, not a transport one.
 
 Robot ACTIONS (navigate, come here, move) are NOT a separate command channel:
 the ``system`` prompt the robot forwards each turn carries the inline-skill
@@ -87,7 +89,7 @@ def _send_json(sock, obj):
         return False
 
 
-def _say(text, *, proactive):
+def _say(text):
     with _turn_lock:
         turn = _current_turn
     with _client_lock:
@@ -96,8 +98,6 @@ def _say(text, *, proactive):
         print("[ROBOT] No robot connected; dropping say")
         return "NO-ROBOT-CONNECTED"
     msg = {"type": "say", "turn": turn, "text": str(text)}
-    if proactive:
-        msg["proactive"] = True
     if _send_json(sock, msg):
         return "SEND-SUCCESS"
     print("[ROBOT] Send failed; robot likely disconnected")
@@ -105,19 +105,8 @@ def _say(text, *, proactive):
 
 
 def send_message(text):
-    """Reply to what the person just said. Spoken only while their turn is open."""
-    return _say(text, proactive=False)
-
-
-def notify_message(text):
-    """Speak to the person unprompted (a due reminder, a later thought).
-
-    The robot only speaks says arriving outside a turn when they are marked
-    proactive, because the agent also uses plain sends to narrate its own state
-    on idle wake cycles ("No new user input, standing by") -- which must never be
-    said out loud. Marking is deliberate: the default is to stay silent.
-    """
-    return _say(text, proactive=True)
+    """Say something to the person; delivered whether or not their turn is open."""
+    return _say(text)
 
 
 def _handshake(sock, addr):
