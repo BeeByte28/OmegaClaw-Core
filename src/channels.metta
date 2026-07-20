@@ -61,13 +61,6 @@
                            (py-call (robot.getLastMessage))
                            (py-call (mock.getLastMessage)))))))))
 
-;Schedule a reminder. A real clock owns the deadline; the due text arrives as
-;input, which refills the thinking budget so the agent is awake to say it.
-(= (remind $str)
-   (if (== (commchannel) robot)
-       (py-call (robot.remind $str))
-       REMIND-ONLY-AVAILABLE-ON-THE-ROBOT-CHANNEL))
-
 ;Ask the robot what its camera sees. The robot answers in text, so vision does
 ;not require the agent's own model to be a vision model. The no-argument form is
 ;here because the LLM does write a bare "look"; without it that silently matches

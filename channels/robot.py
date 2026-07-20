@@ -169,12 +169,6 @@ def getLastMessage():
     with _msg_lock:
         tmp = _last_message
         _last_message = ""
-    # Due reminders enter as input so the loop treats them as new and wakes.
-    for text in _due_reminders():
-        entry = f"REMINDER DUE: {text}"
-        tmp = f"{tmp} | {entry}" if tmp else entry
-    # Only when something is actually delivered: the loop polls this every tick,
-    # so logging unconditionally would emit a line per second forever.
     if tmp:
         print(f"[ROBOT] getLastMessage: {tmp}", flush=True)
     return tmp

@@ -4,7 +4,6 @@
     "- Query long-term embedding memory for skills and memories with short phrases only: query string"
     "- Episodes searches history for episodes around a time stamp, time format is same as in TIME: episodes time_string"
     "- Pin a certain string as short-term working memory item to keep track of task state: pin string"
-    "- Remind the person after a delay. The delay is ONE token: seconds, or a number with a unit suffix s/m/h/d. Never split the unit off (remind 1 hour ... is rejected). A real clock wakes you at the deadline, so never try to count time yourself in the loop: remind 5m take a selfie"
     ;SHELL AND FILE I/O:
     "- Execute shell command without apostrophe in string, it returns the command output to you: shell string"
     "- Read file to string: read-file filename"
