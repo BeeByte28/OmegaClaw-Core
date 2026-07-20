@@ -194,6 +194,23 @@ def _send_json(sock, obj):
         return False
 
 
+_BRACKET_PAIRS = (("(", ")"), ("[", "]"), ("{", "}"), ("<", ">"))
+
+
+def _is_bracketed(text):
+    """True if the whole string sits inside one matching bracket pair."""
+    for opener, closer in _BRACKET_PAIRS:
+        if len(text) > 2 and text.startswith(opener) and text.endswith(closer):
+            depth = 0
+            for i, ch in enumerate(text):
+                depth += (ch == opener) - (ch == closer)
+                # Closed before the end: two groups, e.g. "(a) and (b)".
+                if depth == 0 and i < len(text) - 1:
+                    return False
+            return depth == 0
+    return False
+
+
 _INLINE_TAG_RE = re.compile(r"\|[^|]*\|")
 # Every <...> tag, not just a lone one: the agent emits "<response>" but also
 # "<reply></reply>", which a single-tag pattern misses.
@@ -214,6 +231,12 @@ def _is_speakable(text):
     # Only used to decide; the original text is what gets sent.
     without_markup = _MARKUP_RE.sub("", without_tags).strip()
     if not without_markup:
+        return False
+    # Wholly parenthesised text is a stage direction, never speech. Told to
+    # reply with nothing, the LLM narrates the absence instead -- "(empty
+    # reply)", "(no output)" -- and the robot reads that out loud. Speech is
+    # never entirely inside brackets, so this needs no list of phrases.
+    if _is_bracketed(without_markup):
         return False
     return any(ch.isalnum() for ch in without_markup)
 

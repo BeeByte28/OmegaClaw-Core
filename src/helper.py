@@ -177,7 +177,17 @@ def _coerce_speech_lines(lines):
             coerced.append(line)
             continue
         unwrapped = _unwrap_markdown_command(stripped)
-        coerced.append(unwrapped if unwrapped else "send " + stripped)
+        if unwrapped:
+            coerced.append(unwrapped)
+        elif stripped.startswith("(") and stripped.endswith(")"):
+            # An unknown parenthesised expression is a pseudo-command or a stage
+            # direction ("(empty reply)", "(no output)"), never prose the LLM
+            # forgot to wrap. Told to say nothing it narrates the absence, and
+            # coercing that to a send reads it out loud in the room. Passed
+            # through unchanged it evaluates to nothing, which is what was meant.
+            coerced.append(line)
+        else:
+            coerced.append("send " + stripped)
     return coerced
 
 
