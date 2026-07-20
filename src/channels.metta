@@ -68,6 +68,19 @@
        (py-call (robot.remind $str))
        REMIND-ONLY-AVAILABLE-ON-THE-ROBOT-CHANNEL))
 
+;Ask the robot what its camera sees. The robot answers in text, so vision does
+;not require the agent's own model to be a vision model. The no-argument form is
+;here because the LLM does write a bare "look"; without it that silently matches
+;nothing at all.
+(= (look)
+   (if (== (commchannel) robot)
+       (py-call (robot.look ""))
+       LOOK-ONLY-AVAILABLE-ON-THE-ROBOT-CHANNEL))
+(= (look $question)
+   (if (== (commchannel) robot)
+       (py-call (robot.look $question))
+       LOOK-ONLY-AVAILABLE-ON-THE-ROBOT-CHANNEL))
+
 ;Send a message to all communication channels:
 !(change-state! &lastsend "")
 (= (send $msg)

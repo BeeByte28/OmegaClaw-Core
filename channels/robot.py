@@ -9,9 +9,20 @@ client and exchanges newline-delimited JSON messages:
                                 inline-skill grammar + live places + nav mode>"}
                    {"type": "cancel"}
                    {"type": "ping"}
+                   {"type": "look_result", "id": 7, "ok": true, "text": "..."}
+                   {"type": "look_result", "id": 7, "ok": false,
+                    "code": "NO-CAMERA", "error": "..."}
   agent -> robot:  {"type": "hello_ack", "ok": true, "auth": "ok"|"off"}
                    {"type": "say", "text": "..."}
                    {"type": "pong"}
+                   {"type": "look_request", "id": 7, "question": "..."}
+
+The agent cannot see: the camera frame lives in the robot's pipeline, and the
+agent's model is not necessarily a vision model. ``look_request`` asks the robot
+to describe what its camera sees right now and answer back in TEXT, so vision is
+a skill the agent invokes when it needs it rather than an image bolted onto every
+prompt. It is the only request the agent makes of the robot, hence the only place
+an id is needed -- to stop a late reply satisfying a newer request.
 
 There are no turn ids. The agent is a continuous loop that speaks and acts on
 its own schedule, so every ``say`` is delivered on arrival: into the person's
@@ -50,6 +61,12 @@ _last_system = ""
 _system_lock = threading.Lock()
 _reminders = []          # (due_epoch_seconds, text), earliest not necessarily first
 _reminders_lock = threading.Lock()
+_look_pending = {}       # request id -> [threading.Event, result string or None]
+_look_seq = 0
+_look_lock = threading.Lock()
+# The robot round-trips to a vision model to answer; a couple of seconds is
+# normal. Matches the pipeline's own llm_timeout.
+_LOOK_TIMEOUT_SEC = 15.0
 
 
 def _set_last(msg):
@@ -229,6 +246,62 @@ def send_message(text):
     return _say(text)
 
 
+def look(question=""):
+    """Ask the robot what its camera sees right now; returns a description.
+
+    Blocks until the robot answers, because the agent has nothing useful to do
+    with a promise -- the next thing it does is talk about what it saw.
+
+    Every failure returns a loud LOOK-FAILED-* string rather than an empty one.
+    An empty result reads as "nothing to report", and the agent will describe a
+    scene it never saw: exactly the confabulation this skill exists to remove.
+    """
+    global _look_seq
+    with _client_lock:
+        sock = _client_sock
+    if sock is None:
+        return "NO-ROBOT-CONNECTED"
+    done = threading.Event()
+    with _look_lock:
+        _look_seq += 1
+        req_id = _look_seq
+        _look_pending[req_id] = [done, None]
+    request = {"type": "look_request", "id": req_id, "question": str(question or "").strip()}
+    if not _send_json(sock, request):
+        with _look_lock:
+            _look_pending.pop(req_id, None)
+        return "LOOK-FAILED-SEND: the robot disconnected"
+    if not done.wait(_LOOK_TIMEOUT_SEC):
+        # Leave nothing behind for a late reply to fill in.
+        with _look_lock:
+            _look_pending.pop(req_id, None)
+        return f"LOOK-FAILED-TIMEOUT: no answer from the camera within {int(_LOOK_TIMEOUT_SEC)}s"
+    with _look_lock:
+        result = _look_pending.pop(req_id, [None, None])[1]
+    return result or "LOOK-FAILED-VISION-ERROR: the robot returned an empty description"
+
+
+def _resolve_look(msg):
+    """Hand a look_result to the waiting look() call, if it is still waiting.
+
+    Unmatched ids are dropped: a reply that arrives after its request timed out
+    must not satisfy the next one, which would describe the room as it was
+    seconds ago and look like a working answer.
+    """
+    req_id = msg.get("id")
+    with _look_lock:
+        slot = _look_pending.get(req_id)
+        if slot is None:
+            print(f"[ROBOT] Stale look_result id={req_id!r} ignored", flush=True)
+            return
+        if msg.get("ok"):
+            slot[1] = str(msg.get("text", "")).strip()
+        else:
+            code = str(msg.get("code", "VISION-ERROR")).strip() or "VISION-ERROR"
+            slot[1] = f"LOOK-FAILED-{code}: {msg.get('error', 'no detail given')}"
+        slot[0].set()
+
+
 def _handshake(sock, addr):
     """Read the hello line and authenticate. Returns robot name or None."""
     sock.settimeout(10)
@@ -296,6 +369,8 @@ def _client_loop(sock, addr, robot_name):
                 # The person stopped listening (barge-in). A reply may
                 # already be in flight; nothing to reconcile, so just log it.
                 print("[ROBOT] Reply cancelled by robot")
+            elif mtype == "look_result":
+                _resolve_look(msg)
             elif mtype == "ping":
                 _send_json(sock, {"type": "pong"})
     print(f"[ROBOT] {robot_name}@{addr} disconnected")
