@@ -137,6 +137,32 @@ def _merge_send_continuations(lines):
     return merged
 
 
+_MARKDOWN_WRAPPERS = ("**", "__", "*", "_", "`")
+
+
+def _unwrap_markdown_command(stripped):
+    """A command the LLM wrapped in markdown emphasis, unwrapped -- else "".
+
+    The LLM writes an occasional command as `_pin ..._`. Without this it is not
+    a recognised command, so _coerce_speech_lines turns it into a `send` and the
+    robot reads its own working memory out loud in the room. Observed live:
+    `send "_pin No new user input and nothing due..."` -> SEND-SUCCESS -> spoken.
+
+    A line that is genuinely speech and merely happens to be italicised will be
+    run as a command instead -- but the LLM emits commands, not prose, so a line
+    that parses as one after removing formatting is far more likely to be a
+    mangled command than an emphasised sentence. Saying working memory aloud is
+    also the worse of the two failures.
+    """
+    for marker in _MARKDOWN_WRAPPERS:
+        if (len(stripped) > 2 * len(marker)
+                and stripped.startswith(marker) and stripped.endswith(marker)):
+            inner = stripped[len(marker):-len(marker)].strip()
+            if _is_known_command(inner):
+                return inner
+    return ""
+
+
 def _coerce_speech_lines(lines):
     """A line whose leading token is not a known command is speech the LLM
     forgot to wrap in `send`; wrap it so it still reaches the user instead of
@@ -150,8 +176,9 @@ def _coerce_speech_lines(lines):
         if (not name or name in LLM_COMMANDS
                 or stripped.startswith("-") or stripped.startswith("(-")):
             coerced.append(line)
-        else:
-            coerced.append("send " + stripped)
+            continue
+        unwrapped = _unwrap_markdown_command(stripped)
+        coerced.append(unwrapped if unwrapped else "send " + stripped)
     return coerced
 
 
