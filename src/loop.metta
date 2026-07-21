@@ -45,7 +45,7 @@
                          " toolName4 arg4" (newline)
                          " toolName5 arg5" (newline)
                          "SAVE_PERMANENT_FILES_DIR: " (memoryDirectory) (newline)
-                         "LAST_SKILL_USE_RESULTS: you must rectify ALERT_FAILED skill use cases " (last_chars (get-state &lastresults) (maxFeedback)) (newline) (newline)
+                         "LAST_SKILL_USE_RESULTS: " (last_chars (get-state &lastresults) (maxFeedback)) (newline)
                          "HISTORY: " (getHistory) (newline)
                          "TIME: " (get_time_as_string)))))
 
