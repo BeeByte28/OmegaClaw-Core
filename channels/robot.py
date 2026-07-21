@@ -69,6 +69,25 @@ _look_lock = threading.Lock()
 _LOOK_TIMEOUT_SEC = 15.0
 
 
+# One line per message crossing the channel, in both directions, so a single
+# grep over the compose log reconstructs a whole turn:
+#
+#   ROBOT SENT      pipeline forwarded the person's utterance   (pipeline)
+#   OMEGACLAW RECV  the agent received it                       (here)
+#   OMEGACLAW SENT  the agent emitted a say, with its outcome    (here)
+#   ROBOT RECV      the pipeline received that say              (pipeline)
+#   ROBOT SAYS      the sentence reached TTS                     (pipeline)
+#
+# A missing link names the hop that dropped it. Text is truncated: these are
+# for correlating, and a full say would bury the surrounding log.
+_LOG_TEXT_MAX = 200
+
+
+def _log_channel(tag, text, detail=""):
+    suffix = f" ({detail})" if detail else ""
+    print(f"[ROBOT] {tag}{suffix}: {str(text)[:_LOG_TEXT_MAX]!r}", flush=True)
+
+
 def _set_last(msg):
     global _last_message
     with _msg_lock:
@@ -243,18 +262,21 @@ def _is_speakable(text):
 
 def _say(text):
     text = str(text)
+    # Logged on every path including the drops: a say the agent believes it made
+    # is exactly what we need to line up against the robot's ROBOT RECV.
     if not _is_speakable(text):
-        print(f"[ROBOT] Not speakable, dropped: {text[:60]!r}", flush=True)
+        _log_channel("OMEGACLAW SENT", text, "dropped, not speakable")
         return "SEND-SKIPPED-NOT-SPEAKABLE: that was not words to say out loud"
     with _client_lock:
         sock = _client_sock
     if sock is None:
-        print("[ROBOT] No robot connected; dropping say")
+        _log_channel("OMEGACLAW SENT", text, "dropped, no robot connected")
         return "NO-ROBOT-CONNECTED"
     msg = {"type": "say", "text": text}
     if _send_json(sock, msg):
+        _log_channel("OMEGACLAW SENT", text)
         return "SEND-SUCCESS"
-    print("[ROBOT] Send failed; robot likely disconnected")
+    _log_channel("OMEGACLAW SENT", text, "send failed, robot likely disconnected")
     return "SEND-FAILURE"
 
 
@@ -381,8 +403,15 @@ def _client_loop(sock, addr, robot_name):
                 if system is not None:
                     with _system_lock:
                         _last_system = str(system)
+                # Logged on arrival, not when the loop polls it: getLastMessage
+                # only prints once the loop drains it, so a message that arrives
+                # and is never picked up looks identical to one that never came.
                 if text:
                     _set_last(f"{speaker}: {text}")
+                    _log_channel("OMEGACLAW RECV", f"{speaker}: {text}")
+                else:
+                    _log_channel("OMEGACLAW RECV", "",
+                                 f"no text, system prompt only, {len(str(system or ''))} chars")
             elif mtype == "cancel":
                 # The person stopped listening (barge-in). A reply may
                 # already be in flight; nothing to reconcile, so just log it.
