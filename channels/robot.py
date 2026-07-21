@@ -12,6 +12,7 @@ client and exchanges newline-delimited JSON messages:
                    {"type": "look_result", "id": 7, "ok": true, "text": "..."}
                    {"type": "look_result", "id": 7, "ok": false,
                     "code": "NO-CAMERA", "error": "..."}
+                   {"type": "clear_history"}
   agent -> robot:  {"type": "hello_ack", "ok": true, "auth": "ok"|"off"}
                    {"type": "say", "text": "..."}
                    {"type": "pong"}
@@ -203,6 +204,29 @@ def get_system():
     """
     with _system_lock:
         return _last_system
+
+
+# Same relative path helper.py uses; the agent runs with /PeTTa as its cwd.
+_HISTORY_PATH = "repos/OmegaClaw-Core/memory/history.metta"
+
+
+def clear_history():
+    """Empty the conversation history the robot's operator asked to clear.
+
+    Only the conversation: long-term memory (remember/chromadb) is deliberately
+    left alone, so "clear chat" cannot silently destroy what the agent has
+    learned about people. Truncated rather than deleted because the file is
+    bind-mounted and getHistory re-reads it every tick -- so this takes effect
+    on the next loop with no restart, and nothing has to recreate the file.
+    """
+    try:
+        with open(_HISTORY_PATH, "w"):
+            pass
+    except OSError as e:
+        print(f"[ROBOT] Could not clear history: {e}", flush=True)
+        return False
+    print("[ROBOT] Conversation history cleared", flush=True)
+    return True
 
 
 def _send_json(sock, obj):
@@ -418,6 +442,8 @@ def _client_loop(sock, addr, robot_name):
                 print("[ROBOT] Reply cancelled by robot")
             elif mtype == "look_result":
                 _resolve_look(msg)
+            elif mtype == "clear_history":
+                clear_history()
             elif mtype == "ping":
                 _send_json(sock, {"type": "pong"})
     # Forget the socket on the way out, or every later say is written into a
