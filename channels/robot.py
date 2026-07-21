@@ -350,6 +350,7 @@ def _handshake(sock, addr):
 
 
 def _client_loop(sock, addr, robot_name):
+    global _client_sock
     sock.settimeout(60)
     buf = b""
     while _running:
@@ -390,6 +391,13 @@ def _client_loop(sock, addr, robot_name):
                 _resolve_look(msg)
             elif mtype == "ping":
                 _send_json(sock, {"type": "pong"})
+    # Forget the socket on the way out, or every later say is written into a
+    # dead one: sendall succeeds against a closed peer until TCP gives up, so
+    # the agent reports SEND-SUCCESS for words nobody hears. Identity-checked
+    # because a newly accepted robot may already have taken the slot.
+    with _client_lock:
+        if _client_sock is sock:
+            _client_sock = None
     print(f"[ROBOT] {robot_name}@{addr} disconnected")
 
 
