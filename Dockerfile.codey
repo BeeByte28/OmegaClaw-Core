@@ -1,0 +1,16 @@
+# Fast coherent overlay for the Codey robot integration: patch this project's
+# divergent source onto our OWN base image, which was built from the full
+# Dockerfile (all deps: FAISS/torch/chromadb + the embedding model). This avoids
+# the ~30-90 min full rebuild AND the version skew of overlaying onto the stock
+# upstream image. Rebuild the base with the full Dockerfile when deps change.
+FROM deepfishsnet/omegaclaw-core:codey-base
+ARG OC=/PeTTa/repos/OmegaClaw-Core
+COPY --chmod=0644 channels/robot.py   ${OC}/channels/robot.py
+COPY --chmod=0644 lib_omegaclaw.metta ${OC}/lib_omegaclaw.metta
+COPY --chmod=0644 src/channels.metta  ${OC}/src/channels.metta
+COPY --chmod=0644 src/loop.metta      ${OC}/src/loop.metta
+COPY --chmod=0644 src/skills.metta    ${OC}/src/skills.metta
+COPY --chmod=0644 src/helper.py       ${OC}/src/helper.py
+COPY --chmod=0644 lib_llm_ext.py      ${OC}/lib_llm_ext.py
+# Mode/ownership must match the base's proxy install (/opt/nginx is 0700 www-data).
+COPY --chown=www-data:www-data --chmod=0600 proxy/nginx.conf.template proxy/nginx.sh /opt/nginx/

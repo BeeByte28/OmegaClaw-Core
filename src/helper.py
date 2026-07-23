@@ -4,19 +4,23 @@ import re
 from datetime import datetime
 
 TS_RE = re.compile(r'^\("(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})"')
+# Must stay in sync with the skills advertised in src/skills.metta (getSkills):
+# an advertised command missing here is treated as speech and wrapped in `send`
+# (see _coerce_speech_lines) or swallowed into a preceding send, instead of run.
 LLM_COMMANDS = {
     "append-file",
     "episodes",
+    "look",
     "metta",
     "pin",
     "query",
     "read-file",
     "remember",
-    "search",
     "send",
     "shell",
     "tavily-search",
     "technical-analysis",
+    "websearch",
     "write-file",
 }
 
@@ -132,12 +136,68 @@ def _merge_send_continuations(lines):
     return merged
 
 
+_MARKDOWN_WRAPPERS = ("**", "__", "*", "_", "`")
+
+
+def _unwrap_markdown_command(stripped):
+    """A command the LLM wrapped in markdown emphasis, unwrapped -- else "".
+
+    The LLM writes an occasional command as `_pin ..._`. Without this it is not
+    a recognised command, so _coerce_speech_lines turns it into a `send` and the
+    robot reads its own working memory out loud in the room. Observed live:
+    `send "_pin No new user input and nothing due..."` -> SEND-SUCCESS -> spoken.
+
+    A line that is genuinely speech and merely happens to be italicised will be
+    run as a command instead -- but the LLM emits commands, not prose, so a line
+    that parses as one after removing formatting is far more likely to be a
+    mangled command than an emphasised sentence. Saying working memory aloud is
+    also the worse of the two failures.
+    """
+    for marker in _MARKDOWN_WRAPPERS:
+        if (len(stripped) > 2 * len(marker)
+                and stripped.startswith(marker) and stripped.endswith(marker)):
+            inner = stripped[len(marker):-len(marker)].strip()
+            if _is_known_command(inner):
+                return inner
+    return ""
+
+
+def _coerce_speech_lines(lines):
+    """A line whose leading token is not a known command is speech the LLM
+    forgot to wrap in `send`; wrap it so it still reaches the user instead of
+    evaluating to a silent no-op. Run AFTER _merge_send_continuations so genuine
+    multi-line sends are already coalesced. Paren-only lines (no command name)
+    and the pin shorthand ('-...') are left for the main loop to handle."""
+    coerced = []
+    for line in lines:
+        stripped = line.strip()
+        name = _get_command_name(line)
+        if (not name or name in LLM_COMMANDS
+                or stripped.startswith("-") or stripped.startswith("(-")):
+            coerced.append(line)
+            continue
+        unwrapped = _unwrap_markdown_command(stripped)
+        if unwrapped:
+            coerced.append(unwrapped)
+        elif stripped.startswith("(") and stripped.endswith(")"):
+            # An unknown parenthesised expression is a pseudo-command or a stage
+            # direction ("(empty reply)", "(no output)"), never prose the LLM
+            # forgot to wrap. Told to say nothing it narrates the absence, and
+            # coercing that to a send reads it out loud in the room. Passed
+            # through unchanged it evaluates to nothing, which is what was meant.
+            coerced.append(line)
+        else:
+            coerced.append("send " + stripped)
+    return coerced
+
+
 def balance_parentheses(s):
     s = s.replace("_quote_", '"').replace("_newline_", "\n")
     sexprs = []
     special_two_arg_cmds = {"write-file", "append-file"}
     lines = [line.strip() for line in s.splitlines() if line.strip()]
     lines = _merge_send_continuations(lines)
+    lines = _coerce_speech_lines(lines)
     for line in lines:
         if line.startswith("(-"):
             line = "(pin -" + line[2:]
@@ -229,6 +289,16 @@ def test_balance_parenthesis():
     assert balance_parentheses('') == '()'
     assert balance_parentheses('   ') == '()'
     assert balance_parentheses('()\nsend hello') == '((send "hello"))'
+    # bare speech the LLM forgot to wrap in `send` must still reach the user
+    assert balance_parentheses('Huh-heh-heh! |smile,1.5,0.7| |yes_once|') == '((send "Huh-heh-heh! |smile,1.5,0.7| |yes_once|"))'
+    assert balance_parentheses('Already got that one\nremember foo') == '((send "Already got that one") (remember "foo"))'
+    assert balance_parentheses('Coming over now |@come_to_me|') == '((send "Coming over now |@come_to_me|"))'
+    # real commands and pin shorthand are untouched by the coercion
+    assert balance_parentheses('send hi\nremember x\npin y') == '((send "hi") (remember "x") (pin "y"))'
+    assert balance_parentheses('- note this') == '((pin "- note this"))'
+    # every advertised skill must be recognized, not coerced to send
+    assert balance_parentheses('websearch weather in tokyo') == '((websearch "weather in tokyo"))'
+    assert balance_parentheses('send checking\nwebsearch tokyo') == '((send "checking") (websearch "tokyo"))'
 
 
 if __name__ == "__main__":

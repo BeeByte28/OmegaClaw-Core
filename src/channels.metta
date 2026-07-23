@@ -12,6 +12,7 @@
 (= (SL_POLL_INTERVAL) (empty))
 (= (WS_URL) (empty))
 (= (WS_TOKEN) (empty))
+(= (ROBOT_port) (empty))
 
 ;Connect all the channels:
 (= (initChannels)
@@ -39,7 +40,10 @@
                               (progn (configure WS_URL "")
                                      (configure WS_TOKEN "")
                                      (py-call (wschat.start_websocket (WS_URL) (WS_TOKEN))))
-                              (py-call (mock.start_mock)))))))))
+                              (if (== (commchannel) robot)
+                                  (progn (configure ROBOT_port 8767)
+                                         (py-call (robot.start_robot (ROBOT_port))))
+                                  (py-call (mock.start_mock))))))))))
 
 ;Receive the latest user message considering all communication channels:
 (= (receive)
@@ -53,7 +57,22 @@
                    (py-call (slack.getLastMessage))
                    (if (== (commchannel) mattermost)
                        (py-call (mattermost.getLastMessage))
-                       (py-call (mock.getLastMessage))))))))
+                       (if (== (commchannel) robot)
+                           (py-call (robot.getLastMessage))
+                           (py-call (mock.getLastMessage)))))))))
+
+;Ask the robot what its camera sees. The robot answers in text, so vision does
+;not require the agent's own model to be a vision model. The no-argument form is
+;here because the LLM does write a bare "look"; without it that silently matches
+;nothing at all.
+(= (look)
+   (if (== (commchannel) robot)
+       (py-call (robot.look ""))
+       LOOK-ONLY-AVAILABLE-ON-THE-ROBOT-CHANNEL))
+(= (look $question)
+   (if (== (commchannel) robot)
+       (py-call (robot.look $question))
+       LOOK-ONLY-AVAILABLE-ON-THE-ROBOT-CHANNEL))
 
 ;Send a message to all communication channels:
 !(change-state! &lastsend "")
@@ -71,4 +90,6 @@
                                    (let $temp (cut) (py-call (slack.send_message $safemsg)))
                                    (if (== (commchannel) mattermost)
                                        (let $temp (cut) (py-call (mattermost.send_message $safemsg)))
-                                       (let $temp (cut) (py-call (mock.send_message $safemsg)))))))))) _))
+                                       (if (== (commchannel) robot)
+                                           (let $temp (cut) (py-call (robot.send_message $safemsg)))
+                                           (let $temp (cut) (py-call (mock.send_message $safemsg))))))))))) _))

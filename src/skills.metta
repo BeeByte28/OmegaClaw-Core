@@ -9,8 +9,14 @@
     "- Read file to string: read-file filename"
     "- Write string to file: write-file filename string"
     "- Append line to file: append-file filename string",
+    ;VISION:
+    "- See what is in front of you right now, optionally asking about the scene: look how many people are here"
+    "  You cannot see without it: nothing about the room reaches you unless you look. Use it whenever someone asks what you see, or what something in front of you is."
+    "  It answers with a description in words. If it returns LOOK-FAILED, say you cannot see right now -- never describe a scene you did not get back."
     ;COMMUNICATION CHANNELS:
     "- Send message to user: send string"
+    "  send reaches the person whenever you use it, including on your own loop cycles when they did not just say anything."
+    "  Never send to narrate your own state or think aloud -- saying that you have no new input and are standing by is said out loud in the room. Use pin for that."
     "- Search the web: websearch string"
     "- Search the web using the Tavily Search Agent: tavily-search string"
     "- Get technical analysis for a stock ticker using the Technical Analysis Agent: technical-analysis ticker"
